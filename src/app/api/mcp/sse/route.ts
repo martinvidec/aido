@@ -1,127 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
-// Attempt to polyfill Web Streams if they are missing from global scope
-import { ReadableStream as NodeWebReadableStream, WritableStream as NodeWebWritableStream } from 'node:stream/web';
-
-// @ts-ignore
-if (typeof globalThis.ReadableStream === 'undefined') {
-  // @ts-ignore
-  globalThis.ReadableStream = NodeWebReadableStream;
-  console.log('[Polyfill] globalThis.ReadableStream was polyfilled.');
-}
-// @ts-ignore
-if (typeof globalThis.WritableStream === 'undefined') {
-  // @ts-ignore
-  globalThis.WritableStream = NodeWebWritableStream;
-  console.log('[Polyfill] globalThis.WritableStream was polyfilled.');
-}
-// End Polyfill
+// Polyfills are now in http-utils.ts
 
 import { Server as McpServer } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { ErrorCode, isInitializeRequest, JSONRPCRequest, RequestSchema, ResultSchema, NotificationSchema, JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
-import { EventEmitter } from 'events'; // Standard Node.js EventEmitter
-import { SocketConnectOpts, NetConnectOpts, TcpSocketConnectOpts, IpcSocketConnectOpts } from 'net'; // Für connect Optionen
-import * as httpMocks from 'node-mocks-http'; // Import node-mocks-http
-import { PassThrough, Readable } from 'stream'; // Node.js PassThrough Stream
-import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { Socket } from 'net';
+import { EventEmitter } from 'events'; // Standard Node.js EventEmitter, needed by node-mocks-http
+import { SocketConnectOpts, NetConnectOpts, TcpSocketConnectOpts, IpcSocketConnectOpts, Socket } from 'net'; // Socket for Opts, NetConnectOpts etc.
+import * as httpMocks from 'node-mocks-http'; 
+import { PassThrough, Readable } from 'stream'; // PassThrough and Readable are for GET handler
+import type { IncomingMessage, ServerResponse } from 'node:http'; // ServerResponse for node-mocks-http, IncomingMessage for both
 
-const mockTodoStore: Record<string, { id: string, text: string, completed: boolean }> = {};
+// Import Schemas
+import {
+    ListTodosParamsSchema, // Keep for z.infer
+    AddTodoParamsSchema, // Keep for z.infer
+    ToolsListRequestSchema,
+    ToolDefinitionSchema, // For typing toolsArray
+    ToolsCallRequestSchema
+} from '@/lib/mcp/schemas';
 
-// --- Global Zod Schemas ---
-const MetaSchema = z.object({
-  _meta: z.object({
-    progressToken: z.any().optional(),
-  }).optional()
-});
+// Import Tool Logic Handlers
+import { handleListTodosLogic, handleAddTodoLogic } from '@/lib/mcp/tool-logic';
 
-// Schemas for list-todos
-const ListTodosParamsSchema = MetaSchema.extend({});
-const ListTodosRequestSchema = RequestSchema.extend({
-    method: z.literal('list-todos'),
-    params: ListTodosParamsSchema.optional(),
-});
-const TodoSchema = z.object({
-    id: z.string(),
-    text: z.string(),
-    completed: z.boolean(),
-});
-const ListTodosResultSchema = ResultSchema.extend({
-    result: z.object({ items: z.array(TodoSchema) }),
-});
+// Import Session Management functions
+import {
+    getActiveSession,
+    setActiveSession,
+    deleteActiveSession
+} from '@/lib/mcp/session-manager';
 
-// Schemas for add-todo
-const AddTodoParamsSchema = MetaSchema.extend({
-  text: z.string(),
-});
-const AddTodoRequestSchema = RequestSchema.extend({
-    method: z.literal('add-todo'),
-    params: AddTodoParamsSchema,
-});
-const AddTodoResultSchema = ResultSchema.extend({
-    result: TodoSchema,
-});
+// Import HTTP Utilities (including ManualMockServerResponse)
+import { ManualMockServerResponse } from '@/lib/mcp/http-utils';
 
-// Schemas for tools/list
-const ToolsListParamsSchema = MetaSchema.extend({});
-const ToolDefinitionSchema = z.object({
-  name: z.string(),
-  description: z.string().optional(),
-  inputSchema: z.object({ 
-    type: z.literal('object'),
-    properties: z.record(z.string(), z.any()).optional(),
-    required: z.array(z.string()).optional(),
-  }).describe("JSON Schema for the tool's input parameters."),
-  outputSchema: z.object({ 
-    type: z.literal('object'),
-    properties: z.record(z.string(), z.any()).optional(),
-  }).optional().describe("JSON Schema for the tool's output."),
-});
-const ToolsListRequestSchema = RequestSchema.extend({
-  method: z.literal('tools/list'),
-  params: ToolsListParamsSchema.optional(),
-});
-const ToolsListResultSchema = ResultSchema.extend({
-  result: z.object({ tools: z.array(ToolDefinitionSchema) }), 
-});
-
-// Schemas for tools/call
-const ToolsCallArgsSchema = z.record(z.string(), z.any()).optional();
-const ToolsCallParamsSchema = MetaSchema.extend({
-    name: z.string(),
-    arguments: ToolsCallArgsSchema,
-});
-const ToolsCallRequestSchema = RequestSchema.extend({
-    method: z.literal('tools/call'),
-    params: ToolsCallParamsSchema,
-});
-const ToolsCallResultSchema = ResultSchema.extend({ 
-    result: z.any(),
-});
-// --- End Global Zod Schemas ---
-
-const activeTransports: Record<string, StreamableHTTPServerTransport> = {};
-const activeServers: Record<string, McpServer> = {};
-
-// --- Internal handlers for actual tool logic ---
-async function handleListTodosLogic(sessionId: string, params: z.infer<typeof ListTodosParamsSchema> | undefined) {
-    console.log(`[${sessionId}] Internal logic for list-todos, params:`, params);
-    const todos = Object.values(mockTodoStore);
-    return { result: { items: todos } };
-}
-
-async function handleAddTodoLogic(sessionId: string, params: z.infer<typeof AddTodoParamsSchema>) {
-    console.log(`[${sessionId}] Internal logic for add-todo, params:`, params);
-    const newTodo = {
-        id: randomUUID(),
-        text: params.text,
-        completed: false,
-    };
-    mockTodoStore[newTodo.id] = newTodo;
-    return { result: newTodo };
-}
+// const activeTransports: Record<string, StreamableHTTPServerTransport> = {}; // Removed
+// const activeServers: Record<string, McpServer> = {}; // Removed
 
 function createAndConfigureMcpServer(sessionId: string): McpServer {
     console.log(`[${sessionId}] Creating new MCP Server instance`);
@@ -185,15 +99,11 @@ function createAndConfigureMcpServer(sessionId: string): McpServer {
                     const addTodoParamsForLogic: z.infer<typeof AddTodoParamsSchema> = {
                         ...(toolArgs || {}),
                         _meta: metaArgs,
-                        text: toolArgs?.text as string, // Ensure text is passed if present
+                        text: toolArgs?.text as string, 
                     } as z.infer<typeof AddTodoParamsSchema>; 
-                     // Ensure text is properly part of the object before parsing if toolArgs is generic
                     if (toolArgs && typeof toolArgs.text === 'string') {
                         addTodoParamsForLogic.text = toolArgs.text;
-                    } else if (!addTodoParamsForLogic.text && toolArgs && typeof toolArgs.text !== 'string') {
-                        // If text is missing or not a string in toolArgs, but AddTodoParamsSchema requires it (and it does)
-                        // Zod parse will catch this. We could also throw a more specific error here.
-                    }
+                    } 
                     AddTodoParamsSchema.parse(addTodoParamsForLogic); // Validate
                     return await handleAddTodoLogic(sessionId, addTodoParamsForLogic);
                 default:
@@ -240,14 +150,14 @@ export async function POST(req: NextRequest) {
         sessionId = newSessionIdFromInit;
         console.log(`[${sessionId}] POST request is an Initialize request. Effective Session ID: ${sessionId}`);
 
-        if (activeServers[sessionId] && activeTransports[sessionId]) {
+        const existingSession = getActiveSession(sessionId);
+        if (existingSession) {
             console.log(`[${sessionId}] Reusing existing server and transport for Initialize.`);
-            mcpServer = activeServers[sessionId];
-            transport = activeTransports[sessionId];
+            mcpServer = existingSession.server;
+            transport = existingSession.transport;
         } else {
             console.log(`[${sessionId}] Creating new server and transport for Initialize.`);
             mcpServer = createAndConfigureMcpServer(sessionId);
-            activeServers[sessionId] = mcpServer;
             transport = new StreamableHTTPServerTransport({
                 sessionIdGenerator: () => sessionId!, 
                 onsessioninitialized: (assignedSessionId: string) => {
@@ -255,7 +165,7 @@ export async function POST(req: NextRequest) {
                 },
                 enableJsonResponse: true, 
             });
-            activeTransports[sessionId] = transport;
+            setActiveSession(sessionId, mcpServer, transport); // Use session manager
             await mcpServer.connect(transport);
         }
     } else {
@@ -264,10 +174,10 @@ export async function POST(req: NextRequest) {
             console.error("[POST] mcp-session-id header required for non-initialize requests.");
             return NextResponse.json({ error: "mcp-session-id header required" }, { status: 400 });
         }
-        if (!activeTransports[sessionId] || !activeServers[sessionId]) {
+        const existingSession = getActiveSession(sessionId);
+        if (!existingSession) {
             console.warn(`[${sessionId}] No active transport or server found for non-initialize POST. Creating new set.`);
             mcpServer = createAndConfigureMcpServer(sessionId);
-            activeServers[sessionId] = mcpServer;
             transport = new StreamableHTTPServerTransport({
                 sessionIdGenerator: () => sessionId!,
                 onsessioninitialized: (assignedSessionId: string) => {
@@ -275,12 +185,12 @@ export async function POST(req: NextRequest) {
                 },
                 enableJsonResponse: true, 
             });
-            activeTransports[sessionId] = transport;
+            setActiveSession(sessionId, mcpServer, transport); // Use session manager
             await mcpServer.connect(transport);
         } else {
             console.log(`[${sessionId}] Reusing existing server and transport for non-Initialize POST.`);
-            mcpServer = activeServers[sessionId];
-            transport = activeTransports[sessionId];
+            mcpServer = existingSession.server;
+            transport = existingSession.transport;
         }
     }
 
@@ -422,220 +332,37 @@ export async function GET(req: NextRequest) {
     if (sessionIdFromHeader) {
         sessionId = sessionIdFromHeader;
         console.log(`[GET Handler - ${sessionId}] SSE request for existing session. LastEventId: ${lastEventId}`);
-        const existingTransport = activeTransports[sessionId];
-        const existingServer = activeServers[sessionId];
+        const existingSession = getActiveSession(sessionId);
 
-        if (existingTransport && existingServer) {
+        if (existingSession) {
             console.log(`[GET Handler - ${sessionId}] Found existing transport and server.`);
-            transport = existingTransport;
-            mcpServer = existingServer;
+            transport = existingSession.transport;
+            mcpServer = existingSession.server;
         } else {
             console.warn(`[GET Handler - ${sessionId}] No active server/transport found for session. Client might need to re-initialize via POST.`);
-            // This path might be problematic if client strictly expects GET to resume.
-            // For now, we'll create new ones, but this implies the session wasn't kept alive or initialized.
             mcpServer = createAndConfigureMcpServer(sessionId);
-            activeServers[sessionId] = mcpServer;
             transport = new StreamableHTTPServerTransport({
                 sessionIdGenerator: () => sessionId,
                 onsessioninitialized: (sId) => console.log(`[GET Handler - ${sId}] Transport session initialized via GET (existing session ID, new instance).`),
             });
-            activeTransports[sessionId] = transport;
-            mcpServer.connect(transport);
+            setActiveSession(sessionId, mcpServer, transport); // Use session manager
+            mcpServer.connect(transport); // Removed await here, as it was not present before and connect doesn't always need await for SSE
             console.log(`[GET Handler - ${sessionId}] Created and connected new transport/server for GET due to missing instances.`);
         }
     } else {
-        // No session ID in header - this is unusual for SSE continuation, client should POST first.
-        // However, some clients might probe with GET first.
         sessionId = randomUUID(); 
         console.warn(`[GET Handler - ${sessionId}] mcp-session-id header missing. Generated new ID: ${sessionId}. Client should ideally POST to initialize first.`);
         mcpServer = createAndConfigureMcpServer(sessionId);
-        activeServers[sessionId] = mcpServer;
         transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => sessionId,
             onsessioninitialized: (sId) => console.log(`[GET Handler - ${sId}] Transport session initialized via GET (no header).`),
         });
-        activeTransports[sessionId] = transport;
-        mcpServer.connect(transport);
+        setActiveSession(sessionId, mcpServer, transport); // Use session manager
+        mcpServer.connect(transport); // Removed await here
         console.log(`[GET Handler - ${sessionId}] Created new server/transport for GET due to missing session ID.`);
     }
 
     const sseNodeStream = new PassThrough();
-
-    // Manual mock for ServerResponse for SSE GET requests
-    class ManualMockServerResponse extends EventEmitter implements ServerResponse {
-        private _headers: Record<string, string | number | string[]> = {};
-        statusCode: number = 200;
-        statusMessage: string = 'OK';
-        headersSent: boolean = false;
-        sendDate: boolean = true;
-        // @ts-ignore
-        req: IncomingMessage; // Will be set by transport or can be shimmed if needed
-
-        // Writable stream properties
-        writable: boolean = true;
-        writableEnded: boolean = false;
-        writableFinished: boolean = false;
-        writableHighWaterMark: number;
-        writableLength: number;
-        writableObjectMode: boolean = false;
-        writableCorked: number = 0;
-        destroyed: boolean = false;
-        // @ts-ignore
-        closed: boolean = false;
-        // @ts-ignore
-        errored: Error | null = null;
-        finished: boolean = false; // Added finished property
-
-
-        constructor(private sseStreamTarget: PassThrough, request: IncomingMessage) {
-            super();
-            // @ts-ignore
-            this.req = request;
-            this.writableHighWaterMark = this.sseStreamTarget.writableHighWaterMark;
-            this.writableLength = this.sseStreamTarget.writableLength;
-            this.sseStreamTarget.on('finish', () => this.emit('finish'));
-            this.sseStreamTarget.on('close', () => this.emit('close'));
-
-        }
-
-        setHeader(name: string, value: string | number | string[]): this {
-            this._headers[name.toLowerCase()] = value;
-            return this;
-        }
-
-        getHeader(name: string): string | number | string[] | undefined {
-            return this._headers[name.toLowerCase()];
-        }
-
-        getHeaders(): Record<string, string | number | string[]> {
-            return this._headers;
-        }
-
-        hasHeader(name: string): boolean {
-            return name.toLowerCase() in this._headers;
-        }
-        
-        removeHeader(name: string): void {
-            delete this._headers[name.toLowerCase()];
-        }
-
-        // @ts-ignore
-        writeHead(statusCode: number, statusMessage?: string | Record<string, string | number | string[]>, headers?: Record<string, string | number | string[]>): this {
-            this.statusCode = statusCode;
-            let actualHeaders: Record<string, string | number | string[]> | undefined;
-            if (typeof statusMessage === 'object') {
-                this.statusMessage = ''; // Or parse from statusMessage if it's a string.
-                actualHeaders = statusMessage;
-            } else if (typeof statusMessage === 'string') {
-                this.statusMessage = statusMessage;
-                if (headers) {
-                    actualHeaders = headers;
-                }
-            }
-            
-            if (actualHeaders) {
-                for (const [key, value] of Object.entries(actualHeaders)) {
-                    this.setHeader(key, value);
-                }
-            }
-            this.headersSent = true; // Simulate headers being sent
-            return this;
-        }
-        
-        write(chunk: any, encoding?: BufferEncoding | ((error?: Error | null) => void), cb?: (error?: Error | null) => void): boolean {
-            let callback: ((error?: Error | null) => void) | undefined;
-            let actualEncoding: BufferEncoding = 'utf-8'; // Default to utf-8
-
-            if (typeof encoding === 'function') {
-                callback = encoding;
-            } else if (typeof encoding === 'string') {
-                actualEncoding = encoding;
-                if (typeof cb === 'function') {
-                    callback = cb;
-                }
-            } else if (typeof cb === 'function') {
-                callback = cb;
-            }
-            
-            const success = this.sseStreamTarget.write(chunk, actualEncoding);
-            if (callback) {
-                process.nextTick(() => callback(null)); // Node.js write callbacks are generally (error) => void
-            }
-            return success;
-        }
-
-        end(chunk?: any, encodingOrCb?: BufferEncoding | (() => void), cb?: () => void): this {
-            let callback: (() => void) | undefined;
-            let encoding: BufferEncoding = 'utf-8';
-
-            if (typeof chunk === 'function') {
-                callback = chunk; chunk = undefined;
-            } else if (typeof encodingOrCb === 'function') {
-                callback = encodingOrCb;
-            } else if (typeof encodingOrCb === 'string') {
-                encoding = encodingOrCb;
-                if (typeof cb === 'function') callback = cb;
-            }
-
-            if (chunk && typeof chunk !== 'function') {
-                this.sseStreamTarget.write(chunk, encoding);
-            } else {
-            }
-            this.sseStreamTarget.end();
-            this.writableEnded = true;
-            this.writableFinished = true;
-            this.finished = true; // Set finished to true
-            if (callback) process.nextTick(callback);
-            return this;
-        }
-
-        flushHeaders(): void { /* For SSE, headers are part of the initial response */ }
-        
-        get socket(): Socket | null { return null; }
-        get connection(): Socket | null { return null; } // Same as socket
-        assignSocket(_socket: Socket): void {}
-        detachSocket(_socket: Socket): void {}
-        // @ts-ignore
-        writeContinue(callback?: () => void): void { if(callback) callback(); }
-        // @ts-ignore
-        setTimeout(_msecs: number, callback?: () => void): this { if(callback) callback(); return this; }
-        // @ts-ignore
-        addTrailers(_headers: any): void {}
-
-        // Writable stream specific methods (mostly delegating or no-op)
-        _write(chunk: any, encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
-            this.sseStreamTarget._write(chunk, encoding, callback);
-        }
-        _final(callback: (error?: Error | null) => void): void {
-            // @ts-ignore
-            this.sseStreamTarget._final?.(callback);
-             if(!this.sseStreamTarget._final) callback(); // If _final doesn't exist on PassThrough for some reason
-        }
-        _destroy(error: Error | null, callback: (error?: Error | null) => void): void {
-            this.sseStreamTarget.destroy(error || undefined); // Pass error or undefined
-            this.destroyed = true;
-            callback(error);
-        }
-        cork(): void { this.sseStreamTarget.cork(); }
-        uncork(): void { this.sseStreamTarget.uncork(); }
-        destroy(error?: Error): this {
-            this.sseStreamTarget.destroy(error);
-            this.destroyed = true;
-            return this;
-        }
-        // @ts-ignore
-        getwritableEnded(): boolean { return this.writableEnded; }
-         // @ts-ignore
-        setDefaultEncoding(encoding: BufferEncoding): this {
-            this.sseStreamTarget.setDefaultEncoding(encoding);
-            return this;
-        }
-         // @ts-ignore
-        pipe<T extends NodeJS.WritableStream>(destination: T, options?: { end?: boolean; }): T {
-            return this.sseStreamTarget.pipe(destination, options);
-        }
-
-    }
 
     const mockReqForGet = httpMocks.createRequest({
         method: 'GET',
@@ -650,7 +377,7 @@ export async function GET(req: NextRequest) {
         }
     });
 
-    const manualResForGet = new ManualMockServerResponse(sseNodeStream, mockReqForGet as any) as unknown as ServerResponse;
+    const manualResForGet = new ManualMockServerResponse(sseNodeStream, mockReqForGet as unknown as IncomingMessage) as unknown as ServerResponse;
 
     console.log(`[GET Handler - ${sessionId}] Using ManualMockServerResponse for SSE stream. Attaching to transport.`);
 
@@ -693,21 +420,15 @@ export async function DELETE(req: NextRequest) {
     if (!sessionId) {
         return NextResponse.json({ error: "mcp-session-id header is required" }, { status: 400 });
     }
-    const transport = activeTransports[sessionId];
-    const mcpServer = activeServers[sessionId]; 
-    if (mcpServer && transport) {
+    const session = getActiveSession(sessionId);
+    if (session && session.transport) {
         console.log(`[DELETE ${sessionId}] Closing and disconnecting transport from server.`);
-        await transport.close();
+        await session.transport.close(); // transport will be closed by the SDK if connect was called
     }
-    if (activeTransports[sessionId]) {
-        console.log(`[DELETE ${sessionId}] Deleting active transport reference.`);
-        delete activeTransports[sessionId];
-    }
-    if (activeServers[sessionId]) {
-        console.log(`[DELETE ${sessionId}] Deleting active server reference.`);
-        delete activeServers[sessionId];
-    }
-    if (!transport && !mcpServer) {
+    
+    const deleted = deleteActiveSession(sessionId); // Use session manager
+
+    if (!deleted) {
         console.log(`[DELETE ${sessionId}] No active session found to delete or already cleaned up.`);
         return NextResponse.json({ message: `Session ${sessionId} not found or already cleaned up.` }, { status: 404 });
     }
