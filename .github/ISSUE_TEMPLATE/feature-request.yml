@@ -45,7 +45,7 @@ body:
       required: true
 
   - type: textarea
-    id: akzeptanzkriterien
+    id: acceptance-criteria
     attributes:
       label: Acceptance Criteria
       description: What needs to be completed for this issue to be considered done?
