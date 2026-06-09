@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-rules-test \"node tests/firestore-rules.test.mjs\""
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
@@ -40,6 +41,7 @@
     "zod": "^3.25.28"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
     "@playwright/cli": "^0.1.13",
     "eslint": "8.57.0",
     "eslint-config-next": "14.1.0"
