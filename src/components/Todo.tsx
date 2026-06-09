@@ -36,7 +36,8 @@ interface UserInfo {
   uid: string;
   displayName: string | null;
   photoURL: string | null;
-  email: string | null;
+  // publicProfiles carry no email; kept optional as a display fallback only
+  email?: string | null;
 }
 
 interface TodoProps {
@@ -139,9 +140,9 @@ export default function Todo({ id, content, text, completed, userId, sharedWith 
       try {
         const userPromises = [
           // Get owner info
-          getDoc(doc(db, 'users', userId)),
+          getDoc(doc(db, 'publicProfiles', userId)),
           // Get shared users info
-          ...(sharedWith ?? []).map(uid => getDoc(doc(db, 'users', uid)))
+          ...(sharedWith ?? []).map(uid => getDoc(doc(db, 'publicProfiles', uid)))
         ];
 
         const userDocs = await Promise.all(userPromises);

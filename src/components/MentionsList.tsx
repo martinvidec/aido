@@ -104,7 +104,7 @@ export default function MentionsList() {
       const newOwnersInfo: Record<string, OwnerInfo> = {};
       const promises = ownerIdsToFetch.map(async (ownerId) => {
         try {
-          const userDocRef = doc(db, 'users', ownerId);
+          const userDocRef = doc(db, 'publicProfiles', ownerId);
           const userDoc = await getDoc(userDocRef);
           if (userDoc.exists()) {
             const data = userDoc.data();

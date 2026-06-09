@@ -19,9 +19,24 @@ service cloud.firestore {
           && (!('mentionedUsers' in request.resource.data) || request.resource.data.mentionedUsers is list);
     }
 
+    // Public, PII-free profile data (displayName/photoURL/emailHash — never
+    // the email itself). Cross-user lookups and search read this collection;
+    // the full user doc below stays owner-only.
+    match /publicProfiles/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasOnly(['displayName', 'displayNameLower', 'photoURL', 'emailHash'])
+        && (!('displayName' in request.resource.data) || request.resource.data.displayName == null || request.resource.data.displayName is string)
+        && (!('displayNameLower' in request.resource.data) || request.resource.data.displayNameLower == null || request.resource.data.displayNameLower is string)
+        && (!('photoURL' in request.resource.data) || request.resource.data.photoURL == null || request.resource.data.photoURL is string)
+        && (!('emailHash' in request.resource.data) || request.resource.data.emailHash == null || request.resource.data.emailHash is string);
+      allow delete: if isOwner(userId);
+    }
+
     // Rules for specific user documents and their subcollections
     match /users/{userId} {
-      allow read: if isAuthenticated();
+      // Owner-only: contains PII (email, timezone, notification settings)
+      allow read: if isOwner(userId);
       allow write: if isOwner(userId); // Owner can write their own user doc
 
       // Reads on todos are governed solely by the collection group rule below

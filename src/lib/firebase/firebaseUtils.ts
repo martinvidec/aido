@@ -53,7 +53,7 @@ export const deleteDocument = (collectionName: string, id: string) =>
   deleteDoc(doc(db, collectionName, id));
 
 // Helper function to generate a SHA-256 hash string from an email
-const generateIdFromEmail = async (email: string): Promise<string> => {
+export const generateIdFromEmail = async (email: string): Promise<string> => {
   const lowerCaseEmail = email.toLowerCase(); // Normalize to lowercase first
   const encoder = new TextEncoder();
   const data = encoder.encode(lowerCaseEmail);
@@ -71,21 +71,76 @@ const generateIdFromEmail = async (email: string): Promise<string> => {
   }
 };
 
-// --- User Profile Functions --- 
+// --- Public Profile Functions ---
+// users/{uid} is owner-readable only (PII like email lives there).
+// publicProfiles/{uid} is the cross-user source: displayName, photoURL and a
+// SHA-256 emailHash for exact-match lookup — never the email itself.
 
-export const saveUserProfile = async (userId: string, data: { email?: string | null; displayName?: string | null; photoURL?: string | null }) => {
-  const userRef = doc(db, 'users', userId);
-  const profileData = {
-    ...data,
-    displayNameLower: data.displayName ? data.displayName.toLowerCase() : null,
-  };
-  await setDoc(userRef, profileData, { merge: true });
+export interface PublicProfile {
+  uid: string;
+  displayName: string | null;
+  photoURL: string | null;
+}
+
+export const upsertPublicProfile = async (user: {
+  uid: string;
+  email?: string | null;
+  displayName?: string | null;
+  photoURL?: string | null;
+}) => {
+  const profileRef = doc(db, 'publicProfiles', user.uid);
+  await setDoc(profileRef, {
+    displayName: user.displayName ?? null,
+    displayNameLower: user.displayName ? user.displayName.toLowerCase() : null,
+    photoURL: user.photoURL ?? null,
+    emailHash: user.email ? await generateIdFromEmail(user.email) : null,
+  }, { merge: true });
 };
 
-export const getUserProfile = async (userId: string) => {
-  const userRef = doc(db, 'users', userId);
-  const docSnap = await getDoc(userRef);
-  return docSnap.exists() ? docSnap.data() : null;
+export const getPublicProfile = async (userId: string): Promise<PublicProfile | null> => {
+  const docSnap = await getDoc(doc(db, 'publicProfiles', userId));
+  if (!docSnap.exists()) return null;
+  const data = docSnap.data();
+  return {
+    uid: docSnap.id,
+    displayName: data.displayName ?? null,
+    photoURL: data.photoURL ?? null,
+  };
+};
+
+// Exact-match lookup by email hash: callers must already know the address,
+// so the user base cannot be enumerated via prefix scans.
+export const findUserByEmail = async (email: string): Promise<PublicProfile | null> => {
+  const emailHash = await generateIdFromEmail(email.trim());
+  const q = query(collection(db, 'publicProfiles'), where('emailHash', '==', emailHash), limit(1));
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return null;
+  const docSnap = snapshot.docs[0];
+  const data = docSnap.data();
+  return {
+    uid: docSnap.id,
+    displayName: data.displayName ?? null,
+    photoURL: data.photoURL ?? null,
+  };
+};
+
+export const searchUsersByDisplayName = async (prefix: string, max = 5): Promise<PublicProfile[]> => {
+  const prefixLower = prefix.toLowerCase();
+  const q = query(
+    collection(db, 'publicProfiles'),
+    where('displayNameLower', '>=', prefixLower),
+    where('displayNameLower', '<=', prefixLower + '\uf8ff'),
+    limit(max)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(docSnap => {
+    const data = docSnap.data();
+    return {
+      uid: docSnap.id,
+      displayName: data.displayName ?? null,
+      photoURL: data.photoURL ?? null,
+    };
+  });
 };
 
 // --- Contact Management Functions --- 
@@ -97,13 +152,11 @@ export const sendContactRequest = async (targetEmailInput: string) => {
   const targetEmail = targetEmailInput.trim().toLowerCase();
   if (currentUser.email?.toLowerCase() === targetEmail) throw new Error("You cannot send a contact request to yourself.");
 
-  const usersRef = collection(db, 'users');
-  const q = query(usersRef, where('email', '==', targetEmail), limit(1));
-  const querySnapshot = await getDocs(q);
+  const targetProfile = await findUserByEmail(targetEmail);
 
   const currentUid = currentUser.uid;
 
-  if (querySnapshot.empty) {
+  if (!targetProfile) {
     // --- User does not exist: Initiate an Invite --- 
     console.log(`User with email ${targetEmail} not found. Initiating an invite.`);
     
@@ -131,10 +184,9 @@ export const sendContactRequest = async (targetEmailInput: string) => {
     return { status: 'invited', message: `User ${targetEmail} not found. An invitation has been initiated.` };
 
   } else {
-    // --- User exists: Proceed with normal contact request --- 
-    const targetUserDoc = querySnapshot.docs[0];
-    const targetUid = targetUserDoc.id;
-    const targetUserData = targetUserDoc.data();
+    // --- User exists: Proceed with normal contact request ---
+    const targetUid = targetProfile.uid;
+    const targetUserData = targetProfile;
 
     const contactRef = doc(db, 'users', currentUid, 'contacts', targetUid);
     const outgoingRequestRef = doc(db, 'users', currentUid, 'outgoingContactRequests', targetUid);
@@ -152,7 +204,7 @@ export const sendContactRequest = async (targetEmailInput: string) => {
       const batch = writeBatch(db);
       batch.set(contactRef, {
         uid: targetUid,
-        email: targetUserData.email || targetEmail,
+        email: targetEmail,
         displayName: targetUserData.displayName || null,
         photoURL: targetUserData.photoURL || null,
         addedAt: serverTimestamp(),
@@ -180,7 +232,9 @@ export const sendContactRequest = async (targetEmailInput: string) => {
       requesterDisplayName: currentUser.displayName,
       requesterPhotoURL: currentUser.photoURL,
     };
-    batch.set(outgoingRequestRef, requestData);
+    // targetEmail lives in the sender's own subcollection so the outgoing
+    // list can show it without reading the target's (now private) user doc.
+    batch.set(outgoingRequestRef, { ...requestData, targetEmail });
     batch.set(targetIncomingRequestRef, incomingData);
     await batch.commit();
     return { status: 'request_sent', message: `Contact request successfully sent to ${targetUserData.displayName || targetEmail}.` };
@@ -219,16 +273,13 @@ export const getOutgoingContactRequests = async (userId: string): Promise<Outgoi
       if (reqData.status !== 'invited') {
         // For non-invite statuses, docId should be a targetUserId
         try {
-          const userProfile = await getUserProfile(docId); // docId is targetUserId here
+          const userProfile = await getPublicProfile(docId); // docId is targetUserId here
           if (userProfile) {
             targetUserProfile = {
               displayName: userProfile.displayName,
-              email: userProfile.email,
+              email: resolvedTargetEmail ?? null,
               photoURL: userProfile.photoURL,
             };
-            // If targetEmail wasn't in the doc (e.g. older pending requests before this change),
-            // try to populate it from the fetched profile.
-            if (!resolvedTargetEmail) resolvedTargetEmail = userProfile.email;
           }
         } catch (profileError) {
           console.error(`Error fetching profile for target user ${docId}:`, profileError);
