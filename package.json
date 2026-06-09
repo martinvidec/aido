@@ -40,6 +40,7 @@
     "zod": "^3.25.28"
   },
   "devDependencies": {
+    "@playwright/cli": "^0.1.13",
     "eslint": "8.57.0",
     "eslint-config-next": "14.1.0"
   }
