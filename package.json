@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-rules-test \"node tests/firestore-rules.test.mjs\""
+    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-rules-test \"node tests/firestore-rules.test.mjs && node tests/storage-rules.test.mjs\""
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
