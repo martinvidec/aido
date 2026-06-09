@@ -55,8 +55,19 @@ export const deleteDocument = (collectionName: string, id: string) =>
   deleteDoc(doc(db, collectionName, id));
 
 // Storage functions
-export const uploadFile = async (file: File, path: string) => {
-  const storageRef = ref(storage, path);
+// The destination path is derived from the signed-in user's uid (matching
+// storage.rules, which only allows writes under users/{uid}/) — callers must
+// not be able to choose arbitrary bucket paths.
+export const uploadFile = async (file: File) => {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("Must be signed in to upload files");
+  }
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const storageRef = ref(
+    storage,
+    `users/${user.uid}/uploads/${crypto.randomUUID()}-${safeName}`
+  );
   await uploadBytes(storageRef, file);
   return getDownloadURL(storageRef);
 };
