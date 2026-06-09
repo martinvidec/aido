@@ -1,4 +1,4 @@
-import { auth, db, storage } from "./firebase";
+import { auth, db } from "./firebase";
 import {
   signOut,
   GoogleAuthProvider,
@@ -20,8 +20,6 @@ import {
   limit,
   orderBy,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-
 // Auth functions
 export const logoutUser = () => signOut(auth);
 
@@ -53,24 +51,6 @@ export const updateDocument = (collectionName: string, id: string, data: any) =>
 
 export const deleteDocument = (collectionName: string, id: string) =>
   deleteDoc(doc(db, collectionName, id));
-
-// Storage functions
-// The destination path is derived from the signed-in user's uid (matching
-// storage.rules, which only allows writes under users/{uid}/) — callers must
-// not be able to choose arbitrary bucket paths.
-export const uploadFile = async (file: File) => {
-  const user = auth.currentUser;
-  if (!user) {
-    throw new Error("Must be signed in to upload files");
-  }
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const storageRef = ref(
-    storage,
-    `users/${user.uid}/uploads/${crypto.randomUUID()}-${safeName}`
-  );
-  await uploadBytes(storageRef, file);
-  return getDownloadURL(storageRef);
-};
 
 // Helper function to generate a SHA-256 hash string from an email
 const generateIdFromEmail = async (email: string): Promise<string> => {
