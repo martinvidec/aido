@@ -11,17 +11,34 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // sharedWith/mentionedUsers gate read access (see the todos collection
+    // group rule below), so they must be lists when present — never maps or
+    // strings that could confuse the `in` membership checks.
+    function hasValidTodoUserLists() {
+      return (!('sharedWith' in request.resource.data) || request.resource.data.sharedWith is list)
+          && (!('mentionedUsers' in request.resource.data) || request.resource.data.mentionedUsers is list);
+    }
+
     // Rules for specific user documents and their subcollections
     match /users/{userId} {
       allow read: if isAuthenticated();
       allow write: if isOwner(userId); // Owner can write their own user doc
 
+      // Reads on todos are governed solely by the collection group rule below
+      // (/{path=**}/todos/{todoId}) — it also matches direct document reads.
       match /todos/{todoId} {
-        allow read, update: if isAuthenticated() && (
-                               isOwner(userId) ||
-                               (resource.data.sharedWith != null && request.auth.uid in resource.data.sharedWith)
-                             );
-        allow create, delete: if isOwner(userId);
+        // Owner may update anything (as long as the access-control lists stay
+        // lists); a sharee may only toggle `completed` — nothing else, so they
+        // can neither alter content nor extend/hijack sharedWith/mentionedUsers.
+        allow update: if (isOwner(userId) && hasValidTodoUserLists()) || (
+                         isAuthenticated() &&
+                         resource.data.sharedWith != null &&
+                         request.auth.uid in resource.data.sharedWith &&
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['completed']) &&
+                         request.resource.data.completed is bool
+                       );
+        allow create: if isOwner(userId) && hasValidTodoUserLists();
+        allow delete: if isOwner(userId);
       }
 
       // Contacts subcollection: users/{ownerId}/contacts/{contactEntryId}
@@ -70,7 +87,9 @@ service cloud.firestore {
       }
     }
 
-    // Collection group queries
+    // Single authoritative read rule for todos: covers collection group
+    // queries AND direct reads of users/{uid}/todos/{todoId} (path[1] is the
+    // owner's uid). Owner, sharees and mentioned users may read.
     match /{path=**}/todos/{todoId} {
        allow read: if isAuthenticated() && (
                        request.auth.uid == path[1] ||
