@@ -19,7 +19,6 @@ This doesn't really matter, but is useful for the AI to understand more about th
 - React with Next.js 14 App Router
 - TailwindCSS
 - Firebase Auth, Storage, and Database
-- Multiple AI endpoints including OpenAI, Anthropic, and Replicate using Vercel's AI SDK
 - **@modelcontextprotocol/sdk:** For MCP server implementation.
 - **Zod:** For schema validation in the MCP server.
 - **node-mocks-http:** For shimming Node.js HTTP objects in Next.js API routes for the MCP SDK.

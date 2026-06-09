@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
-import { DeepgramContextProvider } from "@/lib/contexts/DeepgramContext";
 import { ErrorProvider } from "@/lib/contexts/ErrorContext";
 import MainLayoutClientWrapper from "@/components/MainLayoutClientWrapper";
 import { ThemeProvider } from "@/lib/contexts/ThemeContext";
@@ -24,13 +23,11 @@ export default function RootLayout({
       <body className={`${inter.className} bg-white dark:bg-gray-900 transition-colors duration-200`}>
         <ThemeProvider>
           <AuthProvider>
-            <DeepgramContextProvider>
-              <ErrorProvider>
-                <MainLayoutClientWrapper>
-                  {children}
-                </MainLayoutClientWrapper>
-              </ErrorProvider>
-            </DeepgramContextProvider>
+            <ErrorProvider>
+              <MainLayoutClientWrapper>
+                {children}
+              </MainLayoutClientWrapper>
+            </ErrorProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

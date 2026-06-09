@@ -34,6 +34,9 @@ import {
 // Import HTTP Utilities (including ManualMockServerResponse)
 import { ManualMockServerResponse } from '@/lib/mcp/http-utils';
 
+// Import MCP endpoint auth guard
+import { requireMcpAuth } from '@/lib/mcp/auth';
+
 // const activeTransports: Record<string, StreamableHTTPServerTransport> = {}; // Removed
 // const activeServers: Record<string, McpServer> = {}; // Removed
 
@@ -128,7 +131,11 @@ function createAndConfigureMcpServer(sessionId: string): McpServer {
 }
 
 export async function POST(req: NextRequest) {
-    console.log("[General POST /api/mcp/sse] Incoming request headers:", Object.fromEntries(req.headers.entries()));
+    const authError = requireMcpAuth(req);
+    if (authError) return authError;
+
+    // Do not log full headers here — they contain the Authorization token.
+    console.log("[General POST /api/mcp/sse] Incoming request, session ID:", req.headers.get('mcp-session-id'));
 
     let parsedBody: any;
     try {
@@ -320,6 +327,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+    const authError = requireMcpAuth(req);
+    if (authError) return authError;
+
     const sessionIdFromHeader = req.headers.get('mcp-session-id');
     const lastEventId = req.headers.get('mcp-last-event-id') || null;
 
@@ -414,6 +424,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+    const authError = requireMcpAuth(req);
+    if (authError) return authError;
+
     const sessionId = req.headers.get('mcp-session-id');
     console.log(`[DELETE ${sessionId || '(no id)'}] Incoming DELETE request, session ID: ${sessionId}`);
 
