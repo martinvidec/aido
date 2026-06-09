@@ -57,7 +57,7 @@ export default function ShareTodo({ todoId, userId }: ShareTodoProps) {
         sharedWith: arrayUnion(userToShare.uid)
       });
 
-      const userRef = doc(db, 'users', userToShare.uid);
+      const userRef = doc(db, 'publicProfiles', userToShare.uid);
       const userDoc = await getDoc(userRef);
       const userData = userDoc.exists() ? userDoc.data() : userToShare;
 

@@ -12,6 +12,7 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  collection,
   collectionGroup,
   query,
   where,
@@ -104,6 +105,40 @@ await check('non-owner may not create in foreign collection', assertFails(
   setDoc(doc(db(BOB), `users/${ALICE}/todos/todo-4`), seedTodo)));
 await check('owner may delete a todo', assertSucceeds(
   deleteDoc(doc(db(ALICE), `users/${ALICE}/todos/todo-2`))));
+
+console.log('User docs (PII) and public profiles:');
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), `users/${ALICE}`), {
+    email: 'alice@example.com', displayName: 'Alice', theme: 'system',
+  });
+});
+await check('owner may read own user doc', assertSucceeds(
+  getDoc(doc(db(ALICE), `users/${ALICE}`))));
+await check('other users may not read a foreign user doc (PII)', assertFails(
+  getDoc(doc(db(BOB), `users/${ALICE}`))));
+await check('users collection may not be enumerated', assertFails(
+  getDocs(query(collection(db(BOB), 'users'),
+    where('email', '>=', 'a'), where('email', '<=', 'a')))));
+await check('owner may write own public profile', assertSucceeds(
+  setDoc(doc(db(ALICE), `publicProfiles/${ALICE}`), {
+    displayName: 'Alice', displayNameLower: 'alice', photoURL: null, emailHash: 'abc123',
+  })));
+await check('public profile may not contain extra fields (e.g. email)', assertFails(
+  setDoc(doc(db(ALICE), `publicProfiles/${ALICE}`), {
+    displayName: 'Alice', email: 'alice@example.com',
+  })));
+await check('user may not write a foreign public profile', assertFails(
+  setDoc(doc(db(BOB), `publicProfiles/${ALICE}`), { displayName: 'Mallory' })));
+await check('authenticated users may read public profiles', assertSucceeds(
+  getDoc(doc(db(BOB), `publicProfiles/${ALICE}`))));
+await check('authenticated users may query profiles by displayNameLower', assertSucceeds(
+  getDocs(query(collection(db(BOB), 'publicProfiles'),
+    where('displayNameLower', '>=', 'ali'), where('displayNameLower', '<=', 'ali')))));
+await check('authenticated users may query profiles by emailHash', assertSucceeds(
+  getDocs(query(collection(db(BOB), 'publicProfiles'),
+    where('emailHash', '==', 'abc123')))));
+await check('unauthenticated user may not read public profiles', assertFails(
+  getDoc(doc(testEnv.unauthenticatedContext().firestore(), `publicProfiles/${ALICE}`))));
 
 console.log('Reads (single authoritative collection group rule):');
 await resetTodo();

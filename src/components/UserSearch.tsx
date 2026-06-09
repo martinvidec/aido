@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase/firebase';
+import { findUserByEmail, searchUsersByDisplayName } from '@/lib/firebase/firebaseUtils';
 import Image from 'next/image';
 
 interface User {
@@ -34,47 +33,34 @@ export default function UserSearch({ onSelect, excludeUsers = [] }: UserSearchPr
 
       setIsLoading(true);
       try {
-        const usersRef = collection(db, 'users');
-        const searchTermLower = searchTerm.toLowerCase();
-        
-        // Suche nach E-Mail
-        const emailQuery = query(
-          usersRef,
-          where('email', '>=', searchTermLower),
-          where('email', '<=', searchTermLower + '\uf8ff'),
-          limit(5)
-        );
-        
-        // Suche nach Anzeigenamen
-        const nameQuery = query(
-          usersRef,
-          where('displayName', '>=', searchTermLower),
-          where('displayName', '<=', searchTermLower + '\uf8ff'),
-          limit(5)
-        );
-
-        const [emailSnapshot, nameSnapshot] = await Promise.all([
-          getDocs(emailQuery),
-          getDocs(nameQuery)
-        ]);
-
         const foundUsers = new Map<string, User>();
-        
-        // Füge E-Mail-Ergebnisse hinzu
-        emailSnapshot.docs.forEach(doc => {
-          const user = { uid: doc.id, ...doc.data() } as User;
-          if (!excludeUsers.includes(user.uid)) {
-            foundUsers.set(user.uid, user);
-          }
-        });
 
-        // Füge Namens-Ergebnisse hinzu
-        nameSnapshot.docs.forEach(doc => {
-          const user = { uid: doc.id, ...doc.data() } as User;
-          if (!excludeUsers.includes(user.uid)) {
-            foundUsers.set(user.uid, user);
+        if (searchTerm.includes('@')) {
+          // E-Mail: nur Exact-Match über den Hash — kein Präfix-Scan, damit
+          // die Nutzerbasis nicht enumeriert werden kann.
+          const profile = await findUserByEmail(searchTerm);
+          if (profile && !excludeUsers.includes(profile.uid)) {
+            foundUsers.set(profile.uid, {
+              uid: profile.uid,
+              displayName: profile.displayName,
+              email: searchTerm.trim().toLowerCase(),
+              photoURL: profile.photoURL,
+            });
           }
-        });
+        } else {
+          // Suche nach Anzeigenamen über die öffentlichen Profile (ohne E-Mail)
+          const profiles = await searchUsersByDisplayName(searchTerm, 5);
+          profiles.forEach(profile => {
+            if (!excludeUsers.includes(profile.uid)) {
+              foundUsers.set(profile.uid, {
+                uid: profile.uid,
+                displayName: profile.displayName,
+                email: null,
+                photoURL: profile.photoURL,
+              });
+            }
+          });
+        }
 
         setUsers(Array.from(foundUsers.values()));
       } catch (error) {

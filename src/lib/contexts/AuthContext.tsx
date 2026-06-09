@@ -6,6 +6,7 @@ import { User } from "firebase/auth";
 import { auth, db } from "../firebase/firebase";
 import { doc, setDoc, getDoc, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
+import { upsertPublicProfile } from '../firebase/firebaseUtils';
 import { useTheme } from './ThemeContext';
 import type { Theme as ThemeValue } from './ThemeContext';
 
@@ -36,6 +37,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       if (authUser) {
+        // Keep the public profile (displayName/photoURL/emailHash — no email)
+        // in sync on every login; also lazily migrates existing users.
+        upsertPublicProfile(authUser).catch((error) => {
+          console.error("Error syncing public profile:", error);
+        });
+
         const userDocRef = doc(db, 'users', authUser.uid);
         try {
           unsubscribeRef.current = onSnapshot(userDocRef, (docSnap) => {
