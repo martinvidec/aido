@@ -1,4 +1,4 @@
-import { auth, db, storage } from "./firebase";
+import { auth, db } from "./firebase";
 import {
   signOut,
   GoogleAuthProvider,
@@ -20,8 +20,6 @@ import {
   limit,
   orderBy,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-
 // Auth functions
 export const logoutUser = () => signOut(auth);
 
@@ -53,13 +51,6 @@ export const updateDocument = (collectionName: string, id: string, data: any) =>
 
 export const deleteDocument = (collectionName: string, id: string) =>
   deleteDoc(doc(db, collectionName, id));
-
-// Storage functions
-export const uploadFile = async (file: File, path: string) => {
-  const storageRef = ref(storage, path);
-  await uploadBytes(storageRef, file);
-  return getDownloadURL(storageRef);
-};
 
 // Helper function to generate a SHA-256 hash string from an email
 const generateIdFromEmail = async (email: string): Promise<string> => {
