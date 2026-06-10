@@ -38,8 +38,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Firebase config and service accounts
-src/lib/firebase/firebase.ts
+# Firebase service accounts (firebase.ts is tracked on purpose: it only
+# reads NEXT_PUBLIC_* env vars — keep secrets in env, not in that file)
 src/lib/firebase/serviceAccount.json
 firebase-debug.log*
 firebase-debug.*.log*
