@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Editor } from '@tiptap/react';
+import { normalizeLinkUrl } from '@/lib/tiptap/linkSecurity';
 import {
   FaBold,
   FaItalic,
@@ -61,7 +62,12 @@ const TiptapToolbar: React.FC<TiptapToolbarProps> = ({ editor }) => {
       editor.chain().focus().extendMarkRange('link').unsetLink().run();
       return;
     }
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+    const safeUrl = normalizeLinkUrl(url);
+    if (!safeUrl) {
+      window.alert('Only http(s) and mailto links are allowed.');
+      return;
+    }
+    editor.chain().focus().extendMarkRange('link').setLink({ href: safeUrl }).run();
   }, [editor]);
 
   if (!editor) {
