@@ -22,3 +22,5 @@ This doesn't really matter, but is useful for the AI to understand more about th
 - **@modelcontextprotocol/sdk:** For MCP server implementation.
 - **Zod:** For schema validation in the MCP server.
 - **node-mocks-http:** For shimming Node.js HTTP objects in Next.js API routes for the MCP SDK.
+
+<!-- deploy: 2026-06-10 retrigger for 6fb181a -->
