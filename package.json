@@ -27,10 +27,10 @@
     "@types/react-dom": "^18.2.19",
     "autoprefixer": "^10.4.18",
     "emoji-picker-react": "^4.12.2",
-    "firebase": "^10.14.1",
+    "firebase": "^12.14.0",
     "framer-motion": "^11.3.31",
     "lucide-react": "^0.436.0",
-    "next": "15.2.8",
+    "next": "^15.5.19",
     "node-mocks-http": "^1.17.2",
     "postcss": "^8.4.35",
     "react": "^19.1.0",
@@ -38,12 +38,17 @@
     "react-icons": "^5.5.0",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.3.3",
-    "zod": "^3.25.28"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@firebase/rules-unit-testing": "^3.0.4",
+    "@firebase/rules-unit-testing": "^5.0.1",
     "@playwright/cli": "^0.1.13",
     "eslint": "8.57.0",
-    "eslint-config-next": "14.1.0"
+    "eslint-config-next": "^15.5.19"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "^8.5.15"
+    }
   }
 }

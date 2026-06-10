@@ -1,5 +1,9 @@
-import { RequestSchema, ResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import { ResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+
+// Request schemas are defined standalone (method + params) instead of
+// RequestSchema.extend(...): with zod v4 the extend blows up TypeScript's
+// recursion limit (TS2589) when passed to setRequestHandler.
 
 // --- Global Zod Schemas ---
 export const MetaSchema = z.object({
@@ -10,7 +14,7 @@ export const MetaSchema = z.object({
 
 // Schemas for list-todos
 export const ListTodosParamsSchema = MetaSchema.extend({});
-export const ListTodosRequestSchema = RequestSchema.extend({
+export const ListTodosRequestSchema = z.object({
     method: z.literal('list-todos'),
     params: ListTodosParamsSchema.optional(),
 });
@@ -27,7 +31,7 @@ export const ListTodosResultSchema = ResultSchema.extend({
 export const AddTodoParamsSchema = MetaSchema.extend({
   text: z.string(),
 });
-export const AddTodoRequestSchema = RequestSchema.extend({
+export const AddTodoRequestSchema = z.object({
     method: z.literal('add-todo'),
     params: AddTodoParamsSchema,
 });
@@ -50,7 +54,16 @@ export const ToolDefinitionSchema = z.object({
     properties: z.record(z.string(), z.any()).optional(),
   }).optional().describe("JSON Schema for the tool's output."),
 });
-export const ToolsListRequestSchema = RequestSchema.extend({
+// Plain TS type for tool definitions: z.infer on ToolDefinitionSchema also
+// exceeds the TS recursion limit under zod v4.
+export type ToolDefinition = {
+  name: string;
+  description?: string;
+  inputSchema: { type: 'object'; properties?: Record<string, any>; required?: string[] };
+  outputSchema?: { type: 'object'; properties?: Record<string, any> };
+};
+
+export const ToolsListRequestSchema = z.object({
   method: z.literal('tools/list'),
   params: ToolsListParamsSchema.optional(),
 });
@@ -64,7 +77,7 @@ export const ToolsCallParamsSchema = MetaSchema.extend({
     name: z.string(),
     arguments: ToolsCallArgsSchema,
 });
-export const ToolsCallRequestSchema = RequestSchema.extend({
+export const ToolsCallRequestSchema = z.object({
     method: z.literal('tools/call'),
     params: ToolsCallParamsSchema,
 });
