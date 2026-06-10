@@ -140,6 +140,20 @@ await check('authenticated users may query profiles by emailHash', assertSucceed
 await check('unauthenticated user may not read public profiles', assertFails(
   getDoc(doc(testEnv.unauthenticatedContext().firestore(), `publicProfiles/${ALICE}`))));
 
+console.log('API key hashes (admin-only collection):');
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), `userApiKeys/${ALICE}`), {
+    keyHash: 'deadbeef', keyPrefix: 'aido_xxxx',
+  });
+});
+await check('not even the owner may read their API key doc', assertFails(
+  getDoc(doc(db(ALICE), `userApiKeys/${ALICE}`))));
+await check('clients may not write API key docs', assertFails(
+  setDoc(doc(db(ALICE), `userApiKeys/${ALICE}`), { keyHash: 'forged' })));
+await check('clients may not query the API key collection', assertFails(
+  getDocs(query(collection(db(ALICE), 'userApiKeys'),
+    where('keyHash', '==', 'deadbeef')))));
+
 console.log('Reads (single authoritative collection group rule):');
 await resetTodo();
 await testEnv.withSecurityRulesDisabled(async (ctx) => {

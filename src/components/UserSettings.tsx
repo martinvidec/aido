@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { useError } from '@/lib/hooks/useError';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import Image from 'next/image';
+import ApiKeySettings from './ApiKeySettings';
 
 interface UserSettingsState {
   displayName: string;
@@ -292,6 +293,8 @@ export default function UserSettings() {
             </div>
           </div>
         </div>
+
+        <ApiKeySettings />
 
         {error && (
           <div className="bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded relative" role="alert">
