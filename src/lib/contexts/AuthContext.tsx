@@ -19,6 +19,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Auth debug logs contain UIDs and user-doc contents — keep them out of
+// production consoles. NODE_ENV is inlined at build time, so the calls
+// compile away in prod bundles.
+const debugLog: typeof console.log =
+  process.env.NODE_ENV !== 'production' ? console.log.bind(console) : () => {};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,11 +33,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setTheme } = useTheme();
 
   useEffect(() => {
-    console.log("Setting up auth state listener");
+    debugLog("Setting up auth state listener");
     const unsubscribeAuthState = onAuthStateChanged(auth, async (authUser) => {
-      console.log("Auth state changed:", authUser ? `User logged in (${authUser.uid})` : "No user");
+      debugLog("Auth state changed:", authUser ? `User logged in (${authUser.uid})` : "No user");
       if (unsubscribeRef.current) {
-        console.log("Cleaning up previous user doc listener due to auth state change.");
+        debugLog("Cleaning up previous user doc listener due to auth state change.");
         unsubscribeRef.current();
         unsubscribeRef.current = null;
       }
@@ -48,14 +54,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           unsubscribeRef.current = onSnapshot(userDocRef, (docSnap) => {
             if (docSnap.exists()) {
               const data = docSnap.data();
-              console.log("User document snapshot received:", data);
+              debugLog("User document snapshot received");
               const firestoreTheme = data.theme || 'system';
-              console.log("Setting theme from Firestore snapshot:", firestoreTheme);
+              debugLog("Setting theme from Firestore snapshot:", firestoreTheme);
               setTheme(firestoreTheme as ThemeValue);
               
               setUser(authUser);
             } else {
-              console.log("User document does not exist, creating...");
+              debugLog("User document does not exist, creating...");
               setDoc(userDocRef, {
                 email: authUser.email,
                 displayName: authUser.displayName,
@@ -66,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 language: 'en',
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
               }).then(() => {
-                 console.log("User document created, setting theme to system default.");
+                 debugLog("User document created, setting theme to system default.");
                  setTheme('system');
                  setUser(authUser);
               }).catch(creationError => {
@@ -92,10 +98,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
-      console.log("Cleaning up auth state listener");
+      debugLog("Cleaning up auth state listener");
       unsubscribeAuthState();
       if (unsubscribeRef.current) {
-        console.log("Cleaning up user doc listener on component unmount");
+        debugLog("Cleaning up user doc listener on component unmount");
         unsubscribeRef.current();
         unsubscribeRef.current = null;
       }
@@ -103,22 +109,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [setTheme, loading]);
 
   const signInWithGoogle = async () => {
-    console.log("Starting Google sign in process");
+    debugLog("Starting Google sign in process");
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({
       prompt: 'select_account'
     });
     
     try {
-      console.log("Opening Google sign in popup");
-      const result = await signInWithPopup(auth, provider);
-      console.log("Sign in successful:", result.user.email);
+      debugLog("Opening Google sign in popup");
+      await signInWithPopup(auth, provider);
+      debugLog("Sign in successful");
     } catch (error: any) {
       console.error("Error signing in with Google:", error);
       if (error.code === 'auth/popup-closed-by-user') {
-        console.log("User closed the popup");
+        debugLog("User closed the popup");
       } else if (error.code === 'auth/cancelled-popup-request') {
-        console.log("Sign in was cancelled");
+        debugLog("Sign in was cancelled");
       } else {
         console.error("Unknown error during sign in:", error.message);
       }
@@ -127,14 +133,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOutUser = async () => {
     try {
-      console.log("Starting sign out process");
+      debugLog("Starting sign out process");
       if (unsubscribeRef.current) {
-        console.log("Cleaning up user doc listener before sign out");
+        debugLog("Cleaning up user doc listener before sign out");
         unsubscribeRef.current();
         unsubscribeRef.current = null;
       }
       await firebaseSignOut(auth);
-      console.log("Sign out successful, redirecting to login page...");
+      debugLog("Sign out successful, redirecting to login page...");
       router.push('/login');
     } catch (error: any) {
       console.error("Error signing out:", error.message);
