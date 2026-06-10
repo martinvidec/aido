@@ -9,6 +9,7 @@ import BulletList from '@tiptap/extension-bullet-list';
 import OrderedList from '@tiptap/extension-ordered-list';
 import CodeBlock from '@tiptap/extension-code-block';
 import Link from '@tiptap/extension-link';
+import { ALLOWED_LINK_PROTOCOLS, isSafeLinkUrl } from '@/lib/tiptap/linkSecurity';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import Highlight from '@tiptap/extension-highlight';
@@ -145,7 +146,13 @@ export function useTiptapConfig({
     Link.configure({
       autolink: true,
       linkOnPaste: true,
-      openOnClick: !editable,
+      // Never open on click straight from the editor: shared todos can
+      // contain links authored by other users.
+      openOnClick: false,
+      // Explicit allowlist instead of relying on the library default
+      // (see issue #17): only http(s)/mailto, never javascript: & co.
+      protocols: ALLOWED_LINK_PROTOCOLS,
+      isAllowedUri: (url, ctx) => ctx.defaultValidate(url) && isSafeLinkUrl(url),
     }),
     Highlight,
     Mention.configure(mentionOptions),
