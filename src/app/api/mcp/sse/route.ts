@@ -17,7 +17,7 @@ import {
     ListTodosParamsSchema, // Keep for z.infer
     AddTodoParamsSchema, // Keep for z.infer
     ToolsListRequestSchema,
-    ToolDefinitionSchema, // For typing toolsArray
+    type ToolDefinition, // For typing toolsArray
     ToolsCallRequestSchema
 } from '@/lib/mcp/schemas';
 
@@ -58,7 +58,7 @@ function createAndConfigureMcpServer(sessionId: string): McpServer {
     // --- tools/list Handler (remains the same) ---
     mcpServer.setRequestHandler(ToolsListRequestSchema, async (_request: z.infer<typeof ToolsListRequestSchema>) => {
         console.log(`[${sessionId}] Handling tools/list request:`, _request);
-        const toolsArray: z.infer<typeof ToolDefinitionSchema>[] = [
+        const toolsArray: ToolDefinition[] = [
             {
                 name: 'list-todos',
                 description: 'Lists all todo items.',
@@ -117,7 +117,7 @@ function createAndConfigureMcpServer(sessionId: string): McpServer {
             console.error(`[${sessionId}] Error during tools/call for ${toolName}:`, error);
             let errorMessage = 'Internal server error during tool execution.';
             if (error instanceof z.ZodError) {
-                errorMessage = `Invalid arguments for tool '${toolName}': ${error.errors.map(e => `${e.path.join('.')} - ${e.message}`).join(', ')}`;
+                errorMessage = `Invalid arguments for tool '${toolName}': ${error.issues.map(e => `${e.path.join('.')} - ${e.message}`).join(', ')}`;
             }
             return { error: { code: ErrorCode.InvalidParams, message: errorMessage } };
         }
