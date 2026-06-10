@@ -131,7 +131,7 @@ function createAndConfigureMcpServer(sessionId: string): McpServer {
 }
 
 export async function POST(req: NextRequest) {
-    const authError = requireMcpAuth(req);
+    const authError = await requireMcpAuth(req);
     if (authError) return authError;
 
     // Do not log full headers here — they contain the Authorization token.
@@ -327,7 +327,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-    const authError = requireMcpAuth(req);
+    const authError = await requireMcpAuth(req);
     if (authError) return authError;
 
     const sessionIdFromHeader = req.headers.get('mcp-session-id');
@@ -424,7 +424,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-    const authError = requireMcpAuth(req);
+    const authError = await requireMcpAuth(req);
     if (authError) return authError;
 
     const sessionId = req.headers.get('mcp-session-id');

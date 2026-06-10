@@ -33,6 +33,12 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
     }
 
+    // Personal API key hashes (issue #21): managed exclusively through the
+    // Admin SDK in /api/user/apiKey — no client access, not even the owner.
+    match /userApiKeys/{userId} {
+      allow read, write: if false;
+    }
+
     // Rules for specific user documents and their subcollections
     match /users/{userId} {
       // Owner-only: contains PII (email, timezone, notification settings)
