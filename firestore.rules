@@ -57,6 +57,18 @@ service cloud.firestore {
             && request.resource.data.color is number;
       }
 
+      // Membership of THIS space, looked up from the space doc — used by the
+      // nested todos/daily collections (where `resource` is the child, not the
+      // space). get()/exists() results are cached within a request.
+      function thisSpaceMembers() {
+        return get(/databases/$(database)/documents/spaces/$(spaceId)).data.members;
+      }
+      function isMemberOfThisSpace() {
+        return isAuthenticated()
+            && exists(/databases/$(database)/documents/spaces/$(spaceId))
+            && request.auth.uid in thisSpaceMembers();
+      }
+
       allow read: if isExistingMember();
 
       allow create: if isAuthenticated()
@@ -71,6 +83,47 @@ service cloud.firestore {
 
       allow delete: if isAuthenticated()
         && resource.data.createdBy == request.auth.uid;
+
+      // Todos belong to the space (issue #41): moved out of users/{uid}/todos so
+      // every space member can read AND write — full collaboration replaces the
+      // old "a sharee may only toggle completed" model. tags/mentions must be
+      // lists; createdBy is immutable; waitingOn must be null or a current member.
+      match /todos/{todoId} {
+        function hasValidTodoLists() {
+          return (!('tags' in request.resource.data) || request.resource.data.tags is list)
+              && (!('mentions' in request.resource.data) || request.resource.data.mentions is list);
+        }
+        function hasValidWaitingOn() {
+          return !('waitingOn' in request.resource.data)
+              || request.resource.data.waitingOn == null
+              || (request.resource.data.waitingOn is string
+                  && request.resource.data.waitingOn in thisSpaceMembers());
+        }
+
+        allow read: if isMemberOfThisSpace();
+        allow create: if isMemberOfThisSpace()
+          && request.resource.data.createdBy == request.auth.uid
+          && hasValidTodoLists()
+          && hasValidWaitingOn();
+        allow update: if isMemberOfThisSpace()
+          && request.resource.data.createdBy == resource.data.createdBy
+          && hasValidTodoLists()
+          && hasValidWaitingOn();
+        allow delete: if isMemberOfThisSpace();
+      }
+
+      // Daily "Heute" items (issue #41): short-lived, space-scoped, kept separate
+      // from todos. Any member may read/write; author is immutable.
+      match /daily/{dailyId} {
+        allow read: if isMemberOfThisSpace();
+        allow create: if isMemberOfThisSpace()
+          && request.resource.data.author == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.date is string;
+        allow update: if isMemberOfThisSpace()
+          && request.resource.data.author == resource.data.author;
+        allow delete: if isMemberOfThisSpace();
+      }
     }
 
     // Rules for specific user documents and their subcollections

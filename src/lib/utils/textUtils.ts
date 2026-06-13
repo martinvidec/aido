@@ -44,4 +44,37 @@ export function extractMentionIds(node: any): string[] {
   }
   // Remove duplicates
   return [...new Set(ids)];
-} 
+}
+
+/**
+ * Recursively collects all `text` content from a Tiptap JSON node into a
+ * single string (used to scan a rich-text body for #hashtags).
+ */
+export function extractPlainText(node: any): string {
+  if (!node) return '';
+  let text = typeof node.text === 'string' ? node.text : '';
+  if (Array.isArray(node.content)) {
+    for (const child of node.content) {
+      text += ' ' + extractPlainText(child);
+    }
+  }
+  return text;
+}
+
+/**
+ * Derives the unique #tags of a todo from its title and (Tiptap) body.
+ * Reuses extractHashtags so the redesign keeps the existing tag semantics.
+ */
+export function deriveTags(title: string, body?: any): string[] {
+  return [
+    ...new Set([
+      ...extractHashtags(title || ''),
+      ...extractHashtags(extractPlainText(body)),
+    ]),
+  ];
+}
+
+/** Derives the unique @mention UIDs of a todo from its (Tiptap) body. */
+export function deriveMentions(body?: any): string[] {
+  return extractMentionIds(body);
+}

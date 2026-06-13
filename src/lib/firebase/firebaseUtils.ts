@@ -21,9 +21,12 @@ import {
   orderBy,
   arrayUnion,
   arrayRemove,
+  type QueryDocumentSnapshot,
+  type DocumentData,
 } from "firebase/firestore";
 import { getSpaceColor } from "../theme/colors";
-import type { Space } from "../types";
+import { deriveTags, deriveMentions } from "../utils/textUtils";
+import type { Space, Todo, Daily, TiptapContent } from "../types";
 // Auth functions
 export const logoutUser = () => signOut(auth);
 
@@ -120,6 +123,164 @@ export const removeSpaceMember = (spaceId: string, uid: string) =>
 // Only the creator may delete (enforced by firestore.rules).
 export const deleteSpace = (spaceId: string) =>
   deleteDoc(doc(db, SPACES_COLLECTION, spaceId));
+
+// --- Todos (space-scoped, issue #41) ---
+// Decision: todos live under spaces/{spaceId}/todos (moved out of
+// users/{uid}/todos) so every space member has full read/write access — see
+// firestore.rules. tags/mentions are derived from title/body on every write.
+
+const todosCol = (spaceId: string) =>
+  collection(db, SPACES_COLLECTION, spaceId, "todos");
+const todoRef = (spaceId: string, todoId: string) =>
+  doc(db, SPACES_COLLECTION, spaceId, "todos", todoId);
+
+const mapTodo = (d: QueryDocumentSnapshot<DocumentData>): Todo => {
+  const data = d.data();
+  return {
+    id: d.id,
+    spaceId: typeof data.spaceId === "string" ? data.spaceId : "",
+    title: typeof data.title === "string" ? data.title : "",
+    body: (data.body as TiptapContent | null) ?? null,
+    completed: data.completed === true,
+    waitingOn: typeof data.waitingOn === "string" ? data.waitingOn : null,
+    tags: Array.isArray(data.tags) ? data.tags : [],
+    mentions: Array.isArray(data.mentions) ? data.mentions : [],
+    createdBy: typeof data.createdBy === "string" ? data.createdBy : "",
+    createdAt: data.createdAt ?? null,
+    order: typeof data.order === "number" ? data.order : 0,
+  };
+};
+
+export const createTodo = async (
+  spaceId: string,
+  uid: string,
+  input: {
+    title: string;
+    body?: TiptapContent | null;
+    waitingOn?: string | null;
+    order?: number;
+  }
+): Promise<string> => {
+  if (!spaceId || !uid) throw new Error("Missing space or user.");
+  const body = input.body ?? null;
+  const ref = await addDoc(todosCol(spaceId), {
+    spaceId,
+    title: input.title.trim(),
+    body,
+    completed: false,
+    waitingOn: input.waitingOn ?? null,
+    tags: deriveTags(input.title, body),
+    mentions: deriveMentions(body),
+    createdBy: uid,
+    createdAt: serverTimestamp(),
+    order: input.order ?? 0,
+  });
+  return ref.id;
+};
+
+export const getTodosForSpace = async (spaceId: string): Promise<Todo[]> => {
+  if (!spaceId) return [];
+  const snapshot = await getDocs(query(todosCol(spaceId), orderBy("order", "asc")));
+  return snapshot.docs.map(mapTodo);
+};
+
+// Edit title/body together and re-derive tags/mentions from the new content.
+export const editTodoContent = (
+  spaceId: string,
+  todoId: string,
+  title: string,
+  body: TiptapContent | null
+) =>
+  updateDoc(todoRef(spaceId, todoId), {
+    title: title.trim(),
+    body,
+    tags: deriveTags(title, body),
+    mentions: deriveMentions(body),
+  });
+
+export const setTodoCompleted = (spaceId: string, todoId: string, completed: boolean) =>
+  updateDoc(todoRef(spaceId, todoId), { completed });
+
+export const setTodoWaitingOn = (
+  spaceId: string,
+  todoId: string,
+  waitingOn: string | null
+) => updateDoc(todoRef(spaceId, todoId), { waitingOn });
+
+export const setTodoOrder = (spaceId: string, todoId: string, order: number) =>
+  updateDoc(todoRef(spaceId, todoId), { order });
+
+export const deleteTodo = (spaceId: string, todoId: string) =>
+  deleteDoc(todoRef(spaceId, todoId));
+
+// --- Daily "Heute" items (space-scoped, issue #41) ---
+// Short-lived items, deliberately separate from todos (never appear in the list).
+
+const dailyCol = (spaceId: string) =>
+  collection(db, SPACES_COLLECTION, spaceId, "daily");
+const dailyRef = (spaceId: string, dailyId: string) =>
+  doc(db, SPACES_COLLECTION, spaceId, "daily", dailyId);
+
+// Local date as YYYY-MM-DD (lexicographically comparable for "older than today").
+export const todayString = (): string => {
+  const d = new Date();
+  const month = `${d.getMonth() + 1}`.padStart(2, "0");
+  const day = `${d.getDate()}`.padStart(2, "0");
+  return `${d.getFullYear()}-${month}-${day}`;
+};
+
+const mapDaily = (d: QueryDocumentSnapshot<DocumentData>): Daily => {
+  const data = d.data();
+  return {
+    id: d.id,
+    spaceId: typeof data.spaceId === "string" ? data.spaceId : "",
+    text: typeof data.text === "string" ? data.text : "",
+    completed: data.completed === true,
+    date: typeof data.date === "string" ? data.date : "",
+    author: typeof data.author === "string" ? data.author : "",
+    createdAt: data.createdAt ?? null,
+  };
+};
+
+export const createDaily = async (
+  spaceId: string,
+  uid: string,
+  text: string,
+  date: string = todayString()
+): Promise<string> => {
+  if (!spaceId || !uid) throw new Error("Missing space or user.");
+  const ref = await addDoc(dailyCol(spaceId), {
+    spaceId,
+    text: text.trim(),
+    completed: false,
+    date,
+    author: uid,
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
+};
+
+// Open (not completed) daily items. Single-field filter → no composite index;
+// callers split into today's vs. "liegengeblieben" (date < today) client-side.
+export const getOpenDailyForSpace = async (spaceId: string): Promise<Daily[]> => {
+  if (!spaceId) return [];
+  const snapshot = await getDocs(
+    query(dailyCol(spaceId), where("completed", "==", false))
+  );
+  return snapshot.docs
+    .map(mapDaily)
+    .sort((a, b) => (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0));
+};
+
+// "Liegengeblieben": an open daily item from before today.
+export const isStaleDaily = (d: Daily, today: string = todayString()): boolean =>
+  !d.completed && !!d.date && d.date < today;
+
+export const setDailyCompleted = (spaceId: string, dailyId: string, completed: boolean) =>
+  updateDoc(dailyRef(spaceId, dailyId), { completed });
+
+export const deleteDaily = (spaceId: string, dailyId: string) =>
+  deleteDoc(dailyRef(spaceId, dailyId));
 
 // Helper function to generate a SHA-256 hash string from an email
 export const generateIdFromEmail = async (email: string): Promise<string> => {

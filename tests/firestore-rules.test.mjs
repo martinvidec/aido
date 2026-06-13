@@ -241,6 +241,94 @@ await check('non-member may not delete the space', assertFails(
 await check('creator may delete the space', assertSucceeds(
   deleteDoc(doc(db(ALICE), SPACE_PATH))));
 
+console.log('Space todos & daily (issue #41):');
+const TS = 'space-todos';
+const TODO2_PATH = `spaces/${TS}/todos/t1`;
+const DAILY_PATH = `spaces/${TS}/daily/d1`;
+async function resetSpaceTodos() {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), `spaces/${TS}`), {
+      name: 'S', color: 40, members: [ALICE, BOB], createdBy: ALICE, createdAt: 1 });
+    await setDoc(doc(ctx.firestore(), TODO2_PATH), {
+      spaceId: TS, title: 't', body: null, completed: false, waitingOn: null,
+      tags: [], mentions: [], createdBy: ALICE, createdAt: 1, order: 0 });
+    await setDoc(doc(ctx.firestore(), DAILY_PATH), {
+      spaceId: TS, text: 'milk', completed: false, date: '2020-01-01', author: ALICE, createdAt: 1 });
+  });
+}
+await resetSpaceTodos();
+
+console.log('  todo reads:');
+await check('space member may read a space todo', assertSucceeds(
+  getDoc(doc(db(BOB), TODO2_PATH))));
+await check('non-member may not read a space todo', assertFails(
+  getDoc(doc(db(MALLORY), TODO2_PATH))));
+await check('member may list space todos', assertSucceeds(
+  getDocs(collection(db(BOB), `spaces/${TS}/todos`))));
+await check('non-member may not list space todos', assertFails(
+  getDocs(collection(db(MALLORY), `spaces/${TS}/todos`))));
+
+console.log('  todo writes (full collaboration):');
+await check('member (non-creator) may create a todo', assertSucceeds(
+  setDoc(doc(db(BOB), `spaces/${TS}/todos/t2`), {
+    spaceId: TS, title: 'b', body: null, completed: false, waitingOn: null,
+    tags: [], mentions: [], createdBy: BOB, createdAt: 1, order: 1 })));
+await check('member may not create a todo authored by someone else', assertFails(
+  setDoc(doc(db(BOB), `spaces/${TS}/todos/t3`), {
+    spaceId: TS, title: 'x', completed: false, waitingOn: null,
+    tags: [], mentions: [], createdBy: ALICE, createdAt: 1, order: 1 })));
+await check('non-member may not create a todo', assertFails(
+  setDoc(doc(db(MALLORY), `spaces/${TS}/todos/t4`), {
+    spaceId: TS, title: 'x', completed: false, waitingOn: null,
+    tags: [], mentions: [], createdBy: MALLORY, createdAt: 1, order: 1 })));
+await check('member may not create a todo with non-list tags', assertFails(
+  setDoc(doc(db(ALICE), `spaces/${TS}/todos/t5`), {
+    spaceId: TS, title: 'x', completed: false, waitingOn: null,
+    tags: 'a', mentions: [], createdBy: ALICE, createdAt: 1, order: 1 })));
+await check('member (non-creator) may edit a todo (content + completed)', assertSucceeds(
+  updateDoc(doc(db(BOB), TODO2_PATH), { title: 'edited', completed: true })));
+await check('member may not change a todo createdBy (takeover)', assertFails(
+  updateDoc(doc(db(BOB), TODO2_PATH), { createdBy: BOB })));
+await check('non-member may not update a todo', assertFails(
+  updateDoc(doc(db(MALLORY), TODO2_PATH), { completed: true })));
+
+console.log('  waitingOn validation:');
+await check('member may set waitingOn to a space member', assertSucceeds(
+  updateDoc(doc(db(ALICE), TODO2_PATH), { waitingOn: BOB })));
+await check('member may clear waitingOn (null)', assertSucceeds(
+  updateDoc(doc(db(ALICE), TODO2_PATH), { waitingOn: null })));
+await check('member may not set waitingOn to a non-member', assertFails(
+  updateDoc(doc(db(ALICE), TODO2_PATH), { waitingOn: MALLORY })));
+
+console.log('  todo delete:');
+await check('non-member may not delete a todo', assertFails(
+  deleteDoc(doc(db(MALLORY), TODO2_PATH))));
+await check('member may delete a todo', assertSucceeds(
+  deleteDoc(doc(db(BOB), TODO2_PATH))));
+
+console.log('  daily:');
+await check('member may read a daily item', assertSucceeds(
+  getDoc(doc(db(BOB), DAILY_PATH))));
+await check('non-member may not read a daily item', assertFails(
+  getDoc(doc(db(MALLORY), DAILY_PATH))));
+await check('member may create own daily item', assertSucceeds(
+  setDoc(doc(db(BOB), `spaces/${TS}/daily/d2`), {
+    spaceId: TS, text: 'x', completed: false, date: '2020-01-02', author: BOB, createdAt: 1 })));
+await check('member may not create a daily item authored by someone else', assertFails(
+  setDoc(doc(db(BOB), `spaces/${TS}/daily/d3`), {
+    spaceId: TS, text: 'x', completed: false, date: '2020-01-02', author: ALICE, createdAt: 1 })));
+await check('non-member may not create a daily item', assertFails(
+  setDoc(doc(db(MALLORY), `spaces/${TS}/daily/d4`), {
+    spaceId: TS, text: 'x', completed: false, date: '2020-01-02', author: MALLORY, createdAt: 1 })));
+await check('member (non-author) may toggle daily completed', assertSucceeds(
+  updateDoc(doc(db(BOB), DAILY_PATH), { completed: true })));
+await check('member may not change a daily author', assertFails(
+  updateDoc(doc(db(BOB), DAILY_PATH), { author: BOB })));
+await check('non-member may not delete a daily item', assertFails(
+  deleteDoc(doc(db(MALLORY), `spaces/${TS}/daily/d2`))));
+await check('member may delete a daily item', assertSucceeds(
+  deleteDoc(doc(db(ALICE), DAILY_PATH))));
+
 await testEnv.cleanup();
 
 if (failures > 0) {
