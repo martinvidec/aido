@@ -100,8 +100,21 @@ export const renameSpace = (spaceId: string, name: string) =>
 export const addSpaceMember = (spaceId: string, uid: string) =>
   updateDoc(doc(db, SPACES_COLLECTION, spaceId), { members: arrayUnion(uid) });
 
-export const removeSpaceMember = (spaceId: string, uid: string) =>
-  updateDoc(doc(db, SPACES_COLLECTION, spaceId), { members: arrayRemove(uid) });
+// Removing a member also clears any todos in the space that were waiting on
+// them. Otherwise such a todo keeps a `waitingOn` pointing at a non-member, and
+// firestore.rules' hasValidWaitingOn() then rejects EVERY subsequent update —
+// the todo can no longer be completed or edited, only deleted (issue #63). Done
+// as one atomic batch so there is never a window where the member is gone but
+// the dangling references remain.
+export const removeSpaceMember = async (spaceId: string, uid: string) => {
+  const stranded = await getDocs(
+    query(todosCol(spaceId), where("waitingOn", "==", uid))
+  );
+  const batch = writeBatch(db);
+  batch.update(doc(db, SPACES_COLLECTION, spaceId), { members: arrayRemove(uid) });
+  stranded.forEach((d) => batch.update(d.ref, { waitingOn: null }));
+  await batch.commit();
+};
 
 // Only the creator may delete (enforced by firestore.rules).
 export const deleteSpace = (spaceId: string) =>
