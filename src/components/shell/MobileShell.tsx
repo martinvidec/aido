@@ -7,14 +7,16 @@ import BottomTabs, { type MobileTab } from "./BottomTabs";
 import BottomSheet from "./BottomSheet";
 import MemberManager from "./MemberManager";
 import MobileTodos from "./list/MobileTodos";
+import MobileHeute from "./heute/MobileHeute";
+import HeuteInput from "./heute/HeuteInput";
 
 /**
- * Per-tab content placeholders (issue #43). Interactive content is built in the
- * feature issues: Heute → #44, Todos → #45, Board → #46.
+ * Per-tab content (issue #43). Heute → #44, Todos → #45; Board (#46) is still a
+ * placeholder.
  */
 function MobileContent({ tab }: { tab: MobileTab }) {
   if (tab === "heute") {
-    return <p className="pt-8 text-center text-sm text-text-dim">Noch nichts für heute.</p>;
+    return <MobileHeute />;
   }
   if (tab === "board") {
     return <p className="pt-8 text-center text-sm text-text-dim">Board folgt.</p>;
@@ -64,27 +66,6 @@ function NewSpaceForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** Fixed Heute chat input bar (placeholder; the real composer lands in #44). */
-function HeuteInputBar() {
-  return (
-    <div className="shrink-0 px-4 pb-3 pt-1">
-      <div
-        className="flex items-center gap-2 rounded-full bg-bg-card"
-        style={{ padding: "8px 8px 8px 18px" }}
-      >
-        <span className="flex-1 text-sm text-text-dim">Sag&apos;s aido kurz …</span>
-        <span
-          className="flex items-center justify-center rounded-full text-white"
-          style={{ width: 30, height: 30, background: "var(--accent)" }}
-          aria-hidden
-        >
-          ↑
-        </span>
-      </div>
-    </div>
-  );
-}
-
 /**
  * Mobile shell (issue #43): single column — fixed header, scrolling content,
  * contextual Heute input, fixed bottom tabs; bottom sheets overlay the root.
@@ -116,7 +97,11 @@ export default function MobileShell() {
         )}
       </div>
 
-      {activeSpace && tab === "heute" && <HeuteInputBar />}
+      {activeSpace && tab === "heute" && (
+        <div className="shrink-0 px-4 pb-3 pt-1">
+          <HeuteInput />
+        </div>
+      )}
 
       <BottomTabs tab={tab} onChange={setTab} />
 
