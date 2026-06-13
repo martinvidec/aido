@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Aido is a collaborative todo app: Next.js 15 (App Router) + React 19 + TypeScript + Tailwind, with Firebase (Auth, Firestore) on the client, `firebase-admin` on the server, Cloud Functions v2 for invite e-mails, and an MCP server endpoint. All application source lives under `src/`. (Note: `.cursorrules` is stale — it predates the App Router restructure and references removed OpenAI/Anthropic/Replicate/Deepgram integrations; ignore it.)
+Aido is a collaborative todo app: Next.js 15 (App Router) + React 19 + TypeScript + Tailwind, with Firebase (Auth, Firestore) on the client, `firebase-admin` on the server, Cloud Functions v2 for invite e-mails, and an MCP server endpoint. All application source lives under `src/`. The UI was redesigned around **Spaces** (epic #38) — see "Redesign UI (Spaces shell)" below.
 
 ## Commands
 
@@ -27,7 +27,10 @@ There is no unit-test runner; the only automated tests are the emulator-based se
 ### Data model (Firestore) — authority lives in `firestore.rules`
 - `users/{uid}` — **owner-only**; PII (email, displayName, photoURL, theme, notifications, language, timezone).
 - `publicProfiles/{uid}` — readable by any authenticated user; PII-free (`displayName`, `displayNameLower`, `photoURL`, `emailHash`). This is the source for **all cross-user lookups**; user search is exact-match on `emailHash` (SHA-256) or prefix on `displayNameLower`, so the user base cannot be enumerated.
-- `users/{uid}/todos/{id}` — fields: `text`, `content` (Tiptap JSON), `completed`, `sharedWith[]`, `mentionedUsers[]`, `tags[]`. A single collection-group rule governs reads (owner, sharees, mentioned users). Sharees may only update `completed`; everything else is owner-only.
+- `spaces/{spaceId}` — **top-level; the redesign's organizing unit** (replaces "My Todos / Shared with me"). Fields: `name`, `color` (oklch hue), `members[]`, `createdBy`, `createdAt`. Any member may read/update (rename/recolor/invite); `createdBy`/`createdAt` immutable; only the creator may delete.
+- `spaces/{spaceId}/todos/{id}` — structured todos: `spaceId`, `title`, `body` (Tiptap JSON), `completed`, `waitingOn` (userId|null), `tags[]`, `mentions[]`, `createdBy`, `createdAt`, `order`. **Any space member may read AND write** (full collaboration); `createdBy` immutable; `waitingOn` must be null or a current member. Membership is checked in rules via a `get()` on the parent space.
+- `spaces/{spaceId}/daily/{id}` — short-lived "Heute" items: `spaceId`, `text`, `completed`, `date` (YYYY-MM-DD), `author`, `createdAt`. Member read/write; `author` immutable.
+- `users/{uid}/todos/{id}` — **legacy** (pre-redesign): `text`, `content` (Tiptap JSON), `completed`, `sharedWith[]`, `mentionedUsers[]`, `tags[]`. Superseded by `spaces/{spaceId}/todos`; kept as backup and lazily migrated on login (see Auth flow). A collection-group rule still governs reads; sharees may only update `completed`.
 - `users/{uid}/{contacts,outgoingContactRequests,incomingContactRequests}` — contact graph.
 - `userApiKeys/{uid}` — **admin-only, no client access**; stores only `keyHash` (SHA-256) + `keyPrefix`.
 
@@ -38,16 +41,19 @@ When changing the data model, update `firestore.rules` **and** the tests in `tes
 - **Admin SDK** (`src/lib/firebase/admin.ts`, `server-only`) — initialized from the `FIREBASE_SERVICE_ACCOUNT_KEY` env var; returns `null` when unset so callers degrade to 503 rather than anything insecure. Used only in API routes that need to bypass rules (API-key storage) or verify ID tokens.
 
 ### Auth flow
-`AuthProvider` (`src/lib/contexts/AuthContext.tsx`) wraps the app in `src/app/layout.tsx` (alongside `ThemeProvider`/`ErrorProvider`). It listens via `onAuthStateChanged`, lazily creates the `users/{uid}` doc, and upserts `publicProfiles/{uid}` on every login (this is also the migration path for existing users). `(protected)/layout.tsx` gates pages with a client-side redirect — actual data protection is the Firestore rules, not this guard. Server-side token verification happens in API routes via the Admin SDK's `verifyIdToken`.
+`AuthProvider` (`src/lib/contexts/AuthContext.tsx`) wraps the app in `src/app/layout.tsx` (alongside `ThemeProvider`/`ErrorProvider`). It listens via `onAuthStateChanged`, lazily creates the `users/{uid}` doc, upserts `publicProfiles/{uid}` on every login (also the migration path for existing users), and lazily migrates legacy `users/{uid}/todos` into spaces once per user (issue #48, guarded by the `todosMigratedToSpacesAt` flag; `migrateLegacyTodos` in `firebaseUtils`). `(protected)/layout.tsx` gates pages with a client-side redirect — actual data protection is the Firestore rules, not this guard. Server-side token verification happens in API routes via the Admin SDK's `verifyIdToken`.
 
 ### MCP server (`src/app/api/mcp/sse/route.ts`)
 Model Context Protocol endpoint with `streamable-http` (POST) and SSE (GET) transport. Because the MCP SDK expects Node `http` objects inside Next.js route handlers, requests are shimmed with `node-mocks-http` and a hand-written `ManualMockServerResponse` + Web-Streams polyfills (`src/lib/mcp/http-utils.ts`). Sessions (server+transport per `mcp-session-id`) are held in an in-memory map (`session-manager.ts`) — **not durable across serverless instances**. Tool schemas/handlers are split across `schemas.ts` (Zod 4) and `tool-logic.ts` (`list-todos`/`add-todo`, currently a mock in-memory store). Every handler is guarded by `requireMcpAuth` (`src/lib/mcp/auth.ts`), which accepts either the shared `MCP_AUTH_TOKEN` or a personal API key (hash lookup in `userApiKeys`).
 
 ### Rich-text editing (Tiptap)
-`src/lib/hooks/useTiptapConfig.ts` centralizes the editor config used by `TodoList`/`Todo`. `@`-mentions are sourced from the user's contacts; `#`-hashtags feed list filtering. Links are hardened via `src/lib/tiptap/linkSecurity.ts` (http/https/mailto allowlist, no `javascript:`/`data:`, `openOnClick` off). Never render Tiptap content with `dangerouslySetInnerHTML`/`generateHTML` — it goes through `<EditorContent>`/ProseMirror, which is the XSS-safe path.
+`src/lib/hooks/useTiptapConfig.ts` centralizes the editor config used by the Liste composer/rows (`src/components/shell/list/*`: `TodoEditor` for editing, `TodoBody` for the read-only render). `@`-mentions are sourced from the user's contacts; `#`-hashtags feed list filtering. Checklist checkboxes stay interactive in the read-only body via TaskItem's `onReadOnlyChecked`. Links are hardened via `src/lib/tiptap/linkSecurity.ts` (http/https/mailto allowlist, no `javascript:`/`data:`, `openOnClick` off). Never render Tiptap content with `dangerouslySetInnerHTML`/`generateHTML` — it goes through `<EditorContent>`/ProseMirror, which is the XSS-safe path.
+
+### Redesign UI (Spaces shell)
+`/todos` renders `AppShell` (`src/components/shell/`), which provides the chrome (there is **no global Navbar**). Responsive via CSS: `DesktopShell` (`md:flex`, sidebar + scrolling main column) and `MobileShell` (`md:hidden`, fixed header + bottom tabs + bottom sheets). Workspace state lives in React contexts: `SpacesContext` (spaces, activeSpace, list/board `view`, open counts), `TodosContext` (active space's todos, tag filter, CRUD — **shared by Liste & Board**), `DailyContext` (Heute items), `ToastContext`. Views: Heute (`shell/heute/`), Liste (`shell/list/`), Board (`shell/board/`). Design tokens are oklch CSS variables in `globals.css` (dark default on `:root`, light on `html[data-theme="light"]`); `ThemeContext` toggles `data-theme` **and** the legacy `.dark` class together, and Tailwind utilities map onto the tokens (`bg-bg-card`, `text-text-dim`, `border-border`, …). Fonts: Nunito (UI) + JetBrains Mono (tags/numbers) via `next/font`.
 
 ### Routing
-`src/app/(protected)/{todos,mentions,contacts,settings}/page.tsx` for authed pages, `src/app/login`, API routes under `src/app/api`. Components are in `src/components/` (not `src/app/components`), shared code in `src/lib/{contexts,hooks,firebase,mcp,tiptap}`.
+`src/app/(protected)/{todos,contacts,settings}/page.tsx` for authed pages. `/todos` is the redesigned Spaces shell and the post-login landing route; `/` is a thin redirector (authed → `/todos`, else → `/login`). `src/app/login`, API routes under `src/app/api`. Components are in `src/components/` (shell UI under `src/components/shell/`), shared code in `src/lib/{contexts,hooks,firebase,mcp,tiptap,theme,utils}`.
 
 ## Git workflow
 

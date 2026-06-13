@@ -1,13 +1,11 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
-import { useAuth } from "@/lib/hooks/useAuth";
 import { useSpaces } from "@/lib/contexts/SpacesContext";
 import { spaceColorFromHue } from "@/lib/theme/colors";
-import Avatar from "./Avatar";
 import ThemeToggle from "./ThemeToggle";
 import NewSpaceButton from "./NewSpaceButton";
+import AccountMenu from "./AccountMenu";
 
 /** aido logo: rounded accent square with two white "robot eyes". */
 function Logo() {
@@ -24,7 +22,6 @@ function Logo() {
 }
 
 export default function Sidebar() {
-  const { user } = useAuth();
   const { spaces, activeSpaceId, openCounts, setActiveSpace } = useSpaces();
 
   return (
@@ -81,15 +78,9 @@ export default function Sidebar() {
         <NewSpaceButton />
       </nav>
 
-      {/* Footer: current user + settings */}
-      <div className="mt-auto flex items-center gap-2 border-t border-border pt-3">
-        <Avatar uid={user?.uid ?? "me"} name={user?.displayName} size={28} />
-        <span className="flex-1 truncate text-sm font-semibold">
-          {user?.displayName ?? "Account"}
-        </span>
-        <Link href="/settings" className="text-sm text-text-dim hover:text-text">
-          Settings
-        </Link>
+      {/* Footer: account menu (Settings / Kontakte / Abmelden) */}
+      <div className="mt-auto border-t border-border pt-3">
+        <AccountMenu />
       </div>
     </aside>
   );

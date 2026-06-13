@@ -42,24 +42,6 @@ export const signInWithGoogle = async () => {
   }
 };
 
-// Firestore functions
-export const addDocument = (collectionName: string, data: any) =>
-  addDoc(collection(db, collectionName), data);
-
-export const getDocuments = async (collectionName: string) => {
-  const querySnapshot = await getDocs(collection(db, collectionName));
-  return querySnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  }));
-};
-
-export const updateDocument = (collectionName: string, id: string, data: any) =>
-  updateDoc(doc(db, collectionName, id), data);
-
-export const deleteDocument = (collectionName: string, id: string) =>
-  deleteDoc(doc(db, collectionName, id));
-
 // --- Spaces (issue #40) ---
 // Top-level `spaces/{spaceId}`; membership grants full access. Rights model
 // (see firestore.rules): any member may read/update (rename, recolor, add/remove
