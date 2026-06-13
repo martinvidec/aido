@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script>document.documentElement.dataset.theme = localStorage.getItem('aidoF-theme') || 'dark';</script>
+<style>
+  :root {
+    --bg: oklch(0.22 0.02 270);
+    --bg-side: oklch(0.19 0.02 270);
+    --bg-card: oklch(0.26 0.02 270);
+    --bg-pop: oklch(0.28 0.02 270);
+    --row-hover: oklch(0.29 0.02 270);
+    --border: oklch(0.33 0.02 270);
+    --text: oklch(0.95 0.01 80);
+    --text-dim: oklch(0.62 0.02 270);
+    --check-border: oklch(0.5 0.03 270);
+    --accent: oklch(0.72 0.15 40);
+    --accent-soft: oklch(0.72 0.15 40 / 0.18);
+    --accent-text: oklch(0.83 0.09 40);
+    --mention: oklch(0.8 0.08 200);
+    --mention-bg: oklch(0.72 0.15 200 / 0.18);
+    --tag: oklch(0.8 0.08 40);
+    --wait-text: oklch(0.82 0.1 75);
+    --wait-bg: oklch(0.75 0.14 75 / 0.16);
+    --danger: oklch(0.68 0.18 25);
+    --toggle-bg: oklch(0.35 0.02 270);
+    --toggle-knob: oklch(0.85 0.05 80);
+    --nav-bg: oklch(0.18 0.02 270 / 0.85);
+    --shadow: 0 8px 30px oklch(0 0 0 / 0.4);
+  }
+  html[data-theme="light"] {
+    --bg: oklch(0.965 0.008 80);
+    --bg-side: white;
+    --bg-card: oklch(0.99 0.004 80);
+    --bg-pop: white;
+    --row-hover: oklch(0.93 0.008 80);
+    --border: oklch(0.89 0.01 80);
+    --text: oklch(0.27 0.02 270);
+    --text-dim: oklch(0.55 0.02 270);
+    --check-border: oklch(0.78 0.02 80);
+    --accent-soft: oklch(0.72 0.15 40 / 0.14);
+    --accent-text: oklch(0.5 0.12 40);
+    --mention: oklch(0.5 0.12 200);
+    --mention-bg: oklch(0.72 0.15 200 / 0.14);
+    --tag: oklch(0.55 0.12 40);
+    --wait-text: oklch(0.5 0.12 75);
+    --wait-bg: oklch(0.75 0.14 75 / 0.18);
+    --danger: oklch(0.55 0.2 25);
+    --toggle-bg: oklch(0.85 0.01 80);
+    --toggle-knob: oklch(0.72 0.15 40);
+    --nav-bg: oklch(1 0 0 / 0.88);
+    --shadow: 0 8px 30px oklch(0 0 0 / 0.16);
+  }
+  body { margin: 0; background: oklch(0.8 0.04 265); }
+  * { box-sizing: border-box; }
+  input::placeholder, textarea::placeholder { color: var(--text-dim); }
+  .aido-scroll::-webkit-scrollbar { width: 0; height: 0; }
+  .aido-scroll { scrollbar-width: none; }
+</style>
+</helmet>
+
+<div data-screen-label="Aido Mobile" onClick="{{ closeAll }}" style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 36px 20px; font-family: Nunito, sans-serif; background: linear-gradient(155deg, oklch(0.86 0.04 250), oklch(0.8 0.05 30));">
+
+  <x-import component="IOSDevice" from="./ios-frame.jsx" dark="{{ deviceDark }}" hint-size="402px,874px">
+
+    <div style="height: 100%; display: flex; flex-direction: column; position: relative; background: var(--bg); color: var(--text); overflow: hidden;">
+
+      <!-- ===== HEADER ===== -->
+      <div style="flex-shrink: 0; padding: 56px 18px 10px; background: var(--nav-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border);">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 28px; height: 28px; border-radius: 9px; background: var(--accent); display: flex; align-items: center; justify-content: center; gap: 4px; flex-shrink: 0;">
+            <span style="width: 5px; height: 5px; border-radius: 50%; background: white; display: block;"></span>
+            <span style="width: 5px; height: 5px; border-radius: 50%; background: white; display: block;"></span>
+          </div>
+          <span style="font-weight: 900; font-size: 18px;">aido</span>
+          <span style="margin-left: auto; display: flex; align-items: center; gap: 12px;">
+            <span style="display: flex;">
+              <sc-for list="{{ memberAvatars }}" as="av" hint-placeholder-count="2">
+                <span title="{{ av.name }}" style="width: 26px; height: 26px; border-radius: 50%; background: {{ av.color }}; color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg); margin-left: {{ av.ml }};">{{ av.initials }}</span>
+              </sc-for>
+            </span>
+            <span onClick="{{ toggleTheme }}" title="Theme wechseln" style="width: 42px; height: 24px; border-radius: 99px; background: var(--toggle-bg); display: flex; align-items: center; padding: 2px; cursor: pointer; flex-shrink: 0;">
+              <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--toggle-knob); display: block; margin-left: {{ knobMl }}; transition: margin-left 0.2s;"></span>
+            </span>
+          </span>
+        </div>
+
+        <!-- space pills -->
+        <div class="aido-scroll" style="display: flex; gap: 8px; overflow-x: auto; margin: 12px -18px 0; padding: 0 18px 2px;">
+          <sc-for list="{{ spacePills }}" as="sp" hint-placeholder-count="3">
+            <span onClick="{{ sp.pick }}" style="display: flex; align-items: center; gap: 7px; flex-shrink: 0; background: {{ sp.bg }}; color: {{ sp.fg }}; border: 1px solid {{ sp.border }}; border-radius: 99px; padding: 7px 14px; cursor: pointer; font-size: 13px; font-weight: {{ sp.weight }};">
+              <span style="width: 9px; height: 9px; border-radius: 3px; background: {{ sp.color }}; display: block;"></span>
+              {{ sp.name }}
+              <sc-if value="{{ sp.count }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size: 11px; font-weight: 800; opacity: 0.7;">{{ sp.count }}</span>
+              </sc-if>
+            </span>
+          </sc-for>
+          <span onClick="{{ openSpaceSheet }}" style="flex-shrink: 0; border: 1px dashed var(--border); border-radius: 99px; padding: 7px 14px; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--text-dim);">+ Space</span>
+        </div>
+      </div>
+
+      <!-- ===== SCROLL CONTENT ===== -->
+      <div class="aido-scroll" style="flex: 1; min-height: 0; overflow-y: auto; padding: 16px 16px 20px;">
+
+        <!-- ---------- HEUTE ---------- -->
+        <sc-if value="{{ isHeute }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 17px; font-weight: 900;">Heute</span>
+              <span style="font-size: 12px; font-weight: 700; color: var(--text-dim);">landet nicht in der Liste</span>
+              <sc-if value="{{ dailyOpenCount }}" hint-placeholder-val="{{ false }}">
+                <span style="margin-left: auto; font-size: 12px; font-weight: 800; color: var(--accent-text);">{{ dailyOpenCount }} offen</span>
+              </sc-if>
+            </div>
+
+            <sc-for list="{{ leftovers }}" as="d" hint-placeholder-count="0">
+              <div style="display: flex; align-items: center; gap: 8px; padding: 4px 2px; opacity: 0.8;">
+                <span style="font-size: 10px; font-weight: 800; color: var(--wait-text); background: var(--wait-bg); border-radius: 6px; padding: 2px 7px; flex-shrink: 0;">liegengeblieben</span>
+                <span style="font-size: 13px; font-weight: 700; min-width: 0;">{{ d.textEl }}</span>
+                <span onClick="{{ d.moveToList }}" style="margin-left: auto; font-size: 11px; font-weight: 800; color: var(--accent-text); cursor: pointer; border: 1px solid var(--accent-text); border-radius: 99px; padding: 3px 10px; flex-shrink: 0;">→ Liste</span>
+                <span onClick="{{ d.remove }}" style="font-size: 13px; font-weight: 800; color: var(--text-dim); cursor: pointer; padding: 4px; flex-shrink: 0;">✕</span>
+              </div>
+            </sc-for>
+
+            <sc-for list="{{ dailyItems }}" as="d" hint-placeholder-count="3">
+              <div style="display: flex; gap: 8px; align-items: flex-end; justify-content: {{ d.justify }};">
+                <sc-if value="{{ d.showAvatar }}" hint-placeholder-val="{{ false }}">
+                  <span title="{{ d.authorName }}" style="width: 28px; height: 28px; border-radius: 50%; background: {{ d.authorColor }}; color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">{{ d.authorInitials }}</span>
+                </sc-if>
+                <div style="display: flex; flex-direction: column; gap: 3px; align-items: {{ d.alignItems }}; max-width: 78%; min-width: 0;">
+                  <sc-if value="{{ d.meta }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); padding: 0 8px;">{{ d.meta }}</span>
+                  </sc-if>
+                  <div style="display: flex; align-items: center; gap: 10px; background: var(--bg-card); border: 1px solid var(--border); border-radius: {{ d.bubbleRadius }}; padding: 10px 14px; opacity: {{ d.opacity }};">
+                    <span onClick="{{ d.toggle }}" style="width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; cursor: pointer; flex-shrink: 0; color: white; background: {{ d.checkBg }}; border: {{ d.checkBorder }};">{{ d.checkMark }}</span>
+                    <span style="font-size: 14px; font-weight: 700; min-width: 0; text-decoration: {{ d.deco }};">{{ d.textEl }}</span>
+                    <span onClick="{{ d.remove }}" style="font-size: 12px; font-weight: 800; color: var(--text-dim); cursor: pointer; padding: 2px 0 2px 2px; flex-shrink: 0;">✕</span>
+                  </div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- ---------- TODOS ---------- -->
+        <sc-if value="{{ isTodos }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+
+            <!-- quick add -->
+            <div style="position: relative;">
+              <div style="display: flex; align-items: center; gap: 10px; background: var(--bg-card); border: 1.5px solid {{ activeColor }}; border-radius: 14px; padding: 12px 14px;">
+                <span style="color: {{ activeColor }}; font-weight: 900; font-size: 19px; line-height: 1;">+</span>
+                <input ref="{{ inputRef }}" value="{{ draft }}" onChange="{{ onDraftChange }}" onKeyDown="{{ onDraftKey }}" placeholder="Todo … @ Person, # Tag" style="flex: 1; min-width: 0; background: transparent; border: none; outline: none; font-size: 15px; font-family: inherit; font-weight: 600; color: var(--text);">
+                <span onClick="{{ openComposer }}" title="Beschreibung" style="font-size: 16px; color: var(--text-dim); cursor: pointer; padding: 2px 6px; flex-shrink: 0;">⌵</span>
+                <span onClick="{{ addTodo }}" style="font-size: 13px; font-weight: 800; background: {{ activeColor }}; color: white; border-radius: 9px; padding: 8px 14px; cursor: pointer; flex-shrink: 0;">Add</span>
+              </div>
+              <sc-if value="{{ suggestOpen }}" hint-placeholder-val="{{ false }}">
+                <div style="position: absolute; top: 100%; left: 0; right: 0; margin-top: 6px; background: var(--bg-pop); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); padding: 6px; display: flex; flex-direction: column; z-index: 20;">
+                  <sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="2">
+                    <div onClick="{{ s.pick }}" style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; cursor: pointer;" style-hover="background: var(--row-hover)">
+                      <span style="width: 28px; height: 28px; border-radius: 50%; background: {{ s.color }}; color: white; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">{{ s.badge }}</span>
+                      <span style="font-size: 14px; font-weight: 800;">{{ s.label }}</span>
+                      <span style="margin-left: auto; font-size: 12px; color: var(--text-dim);">{{ s.sub }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+
+            <!-- composer expanded -->
+            <sc-if value="{{ composerOpen }}" hint-placeholder-val="{{ false }}">
+              <div onClick="{{ stop }}" style="background: var(--bg-card); border: 1.5px solid {{ activeColor }}; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 4px;">
+                  <span onClick="{{ fmtClick }}" style="font-weight: 900; font-size: 14px; padding: 4px 9px; border-radius: 7px; cursor: pointer; color: var(--text-dim);">B</span>
+                  <span onClick="{{ fmtClick }}" style="font-style: italic; font-weight: 700; font-size: 14px; padding: 4px 9px; border-radius: 7px; cursor: pointer; color: var(--text-dim);">I</span>
+                  <span onClick="{{ fmtClick }}" style="font-weight: 800; font-size: 14px; padding: 4px 9px; border-radius: 7px; cursor: pointer; color: var(--text-dim);">≔</span>
+                  <span onClick="{{ fmtClick }}" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; padding: 4px 9px; border-radius: 7px; cursor: pointer; color: var(--text-dim);">&lt;/&gt;</span>
+                  <span style="margin-left: auto; font-size: 10px; color: var(--text-dim);">„- [ ] Checkbox"</span>
+                </div>
+                <textarea value="{{ bodyDraft }}" onChange="{{ onBodyChange }}" rows="4" placeholder="Beschreibung — in der App der volle TipTap-Editor …" style="width: 100%; background: transparent; border: 1px solid var(--border); border-radius: 10px; outline: none; font-size: 14px; font-family: inherit; font-weight: 600; line-height: 1.6; color: var(--text); padding: 10px; resize: vertical;"></textarea>
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px;">
+                  <span onClick="{{ closeComposer }}" style="font-size: 13px; font-weight: 800; color: var(--text-dim); cursor: pointer; padding: 8px 12px;">Abbrechen</span>
+                  <span onClick="{{ addTodo }}" style="font-size: 13px; font-weight: 800; background: {{ activeColor }}; color: white; border-radius: 9px; padding: 9px 16px; cursor: pointer;">Hinzufügen</span>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- tag chips -->
+            <sc-if value="{{ hasTags }}" hint-placeholder-val="{{ false }}">
+              <div class="aido-scroll" style="display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px; padding: 0 16px;">
+                <sc-for list="{{ tagChips }}" as="tg" hint-placeholder-count="3">
+                  <span onClick="{{ tg.pick }}" style="flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; background: {{ tg.bg }}; color: {{ tg.color }}; border: 1px solid {{ tg.border }}; border-radius: 99px; padding: 6px 13px; cursor: pointer;">#{{ tg.label }}</span>
+                </sc-for>
+                <sc-if value="{{ hasFilters }}" hint-placeholder-val="{{ false }}">
+                  <span onClick="{{ clearFilters }}" style="flex-shrink: 0; font-size: 12px; font-weight: 800; color: var(--text-dim); cursor: pointer; padding: 6px 8px;">✕ Filter</span>
+                </sc-if>
+              </div>
+            </sc-if>
+
+            <!-- open todos -->
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <sc-for list="{{ openTodos }}" as="todo" hint-placeholder-count="3">
+                <div>
+                  <sc-if value="{{ todo.notEditing }}" hint-placeholder-val="{{ true }}">
+                    <div style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 10px; border-radius: 14px; background: var(--bg-card); border: 1px solid var(--border);">
+                      <span onClick="{{ todo.toggle }}" style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--check-border); flex-shrink: 0; cursor: pointer; display: block; margin-top: 1px;"></span>
+                      <div onClick="{{ todo.toggleExpand }}" style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; cursor: {{ todo.bodyCursor }};">
+                        <span style="font-size: 15px; font-weight: 700; line-height: 1.45; display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap;">{{ todo.titleEl }}
+                          <sc-if value="{{ todo.hasWait }}" hint-placeholder-val="{{ false }}">
+                            <span style="font-size: 10px; font-weight: 800; color: var(--wait-text); background: var(--wait-bg); border-radius: 99px; padding: 2px 9px; white-space: nowrap;">wartet auf {{ todo.waitName }}</span>
+                          </sc-if>
+                          <sc-if value="{{ todo.progress }}" hint-placeholder-val="{{ false }}">
+                            <span style="font-size: 10px; font-weight: 800; color: var(--text-dim); font-family: 'JetBrains Mono', monospace;">{{ todo.progress }}</span>
+                          </sc-if>
+                          <sc-if value="{{ todo.hasBody }}" hint-placeholder-val="{{ false }}">
+                            <span style="font-size: 11px; color: var(--text-dim);">{{ todo.chevron }}</span>
+                          </sc-if>
+                        </span>
+                        <sc-if value="{{ todo.expanded }}" hint-placeholder-val="{{ false }}">
+                          <div onClick="{{ stop }}" style="display: flex; flex-direction: column; gap: 4px; padding: 2px 0;">{{ todo.bodyEl }}</div>
+                        </sc-if>
+                      </div>
+                      <span onClick="{{ todo.openMenu }}" style="cursor: pointer; color: var(--text-dim); font-weight: 900; letter-spacing: 2px; padding: 2px 8px; flex-shrink: 0; align-self: center;">…</span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ todo.editing }}" hint-placeholder-val="{{ false }}">
+                    <div onClick="{{ stop }}" style="background: var(--bg-card); border: 1.5px solid {{ activeColor }}; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+                      <input value="{{ editTitle }}" onChange="{{ onEditTitle }}" autoFocus="{{ true }}" style="background: transparent; border: none; outline: none; font-size: 16px; font-family: inherit; font-weight: 800; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 6px;">
+                      <textarea value="{{ editBody }}" onChange="{{ onEditBody }}" rows="4" placeholder="Beschreibung … („- [ ] Checkbox")" style="width: 100%; background: transparent; border: 1px solid var(--border); border-radius: 10px; outline: none; font-size: 14px; font-family: inherit; font-weight: 600; line-height: 1.6; color: var(--text); padding: 10px; resize: vertical;"></textarea>
+                      <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px;">
+                        <span onClick="{{ cancelEdit }}" style="font-size: 13px; font-weight: 800; color: var(--text-dim); cursor: pointer; padding: 8px 12px;">Abbrechen</span>
+                        <span onClick="{{ saveEditClick }}" style="font-size: 13px; font-weight: 800; background: {{ activeColor }}; color: white; border-radius: 9px; padding: 9px 16px; cursor: pointer;">Speichern</span>
+                      </div>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+              <sc-if value="{{ emptyMsg }}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 40px 20px; color: var(--text-dim);">
+                  <div style="width: 46px; height: 46px; border-radius: 14px; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <span style="width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: block;"></span>
+                    <span style="width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: block;"></span>
+                  </div>
+                  <span style="font-size: 14px; font-weight: 700; text-align: center;">{{ emptyMsg }}</span>
+                </div>
+              </sc-if>
+            </div>
+
+            <!-- done -->
+            <sc-if value="{{ doneCount }}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
+                <span onClick="{{ toggleDone }}" style="font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); cursor: pointer; padding: 6px 4px; display: flex; gap: 8px; align-items: center; user-select: none;"><span style="display: inline-block; width: 12px;">{{ doneChevron }}</span> Erledigt ({{ doneCount }})</span>
+                <sc-if value="{{ showDone }}" hint-placeholder-val="{{ true }}">
+                  <sc-for list="{{ doneTodos }}" as="todo" hint-placeholder-count="1">
+                    <div style="display: flex; align-items: center; gap: 12px; padding: 11px 10px; border-radius: 14px; opacity: 0.6;">
+                      <span onClick="{{ todo.toggle }}" style="width: 24px; height: 24px; border-radius: 50%; background: {{ activeColor }}; color: white; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; cursor: pointer; flex-shrink: 0;">✓</span>
+                      <span style="flex: 1; min-width: 0; font-size: 15px; font-weight: 600; text-decoration: line-through;">{{ todo.titleEl }}</span>
+                      <span onClick="{{ todo.remove }}" style="cursor: pointer; color: var(--text-dim); font-size: 13px; font-weight: 800; padding: 4px;">✕</span>
+                    </div>
+                  </sc-for>
+                </sc-if>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <!-- ---------- BOARD ---------- -->
+        <sc-if value="{{ isBoard }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 14px;">
+            <div style="display: flex; align-items: center; gap: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 99px; padding: 4px;">
+              <sc-for list="{{ groupTabs }}" as="g" hint-placeholder-count="2">
+                <span onClick="{{ g.pick }}" style="flex: 1; text-align: center; font-size: 13px; font-weight: 800; background: {{ g.bg }}; color: {{ g.color }}; border-radius: 99px; padding: 8px 0; cursor: pointer;">{{ g.label }}</span>
+              </sc-for>
+            </div>
+
+            <sc-for list="{{ boardCols }}" as="col" hint-placeholder-count="3">
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; padding: 2px;">
+                  <sc-if value="{{ col.hasAvatar }}" hint-placeholder-val="{{ false }}">
+                    <span style="width: 22px; height: 22px; border-radius: 50%; background: {{ col.avatarColor }}; color: white; font-size: 9px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">{{ col.avatarInitials }}</span>
+                  </sc-if>
+                  <span style="font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim);">{{ col.label }}</span>
+                  <sc-if value="{{ col.count }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size: 11px; font-weight: 800; color: var(--text-dim);">{{ col.count }}</span>
+                  </sc-if>
+                  <span style="flex: 1; height: 1px; background: var(--border); margin-left: 4px;"></span>
+                </div>
+                <sc-for list="{{ col.cards }}" as="card" hint-placeholder-count="1">
+                  <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; align-items: flex-start; gap: 10px;">
+                      <span onClick="{{ card.toggle }}" style="width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; color: white; cursor: pointer; flex-shrink: 0; margin-top: 1px; background: {{ card.checkBg }}; border: {{ card.checkBorder }};">{{ card.checkMark }}</span>
+                      <span style="flex: 1; min-width: 0; font-size: 14px; font-weight: 700; line-height: 1.4; text-decoration: {{ card.deco }};">{{ card.titleEl }}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; padding-left: 32px;">
+                      <sc-if value="{{ card.progress }}" hint-placeholder-val="{{ false }}">
+                        <span style="font-size: 11px; font-weight: 800; color: var(--text-dim); font-family: 'JetBrains Mono', monospace;">{{ card.progress }}</span>
+                      </sc-if>
+                      <sc-if value="{{ card.showWait }}" hint-placeholder-val="{{ false }}">
+                        <span style="font-size: 10px; font-weight: 800; color: var(--wait-text); background: var(--wait-bg); border-radius: 99px; padding: 2px 9px;">bei {{ card.waitName }}</span>
+                      </sc-if>
+                      <span onClick="{{ card.move }}" style="margin-left: auto; font-size: 11px; font-weight: 800; color: var(--accent-text); border: 1px solid var(--accent-text); border-radius: 99px; padding: 4px 12px; cursor: pointer;">Verschieben</span>
+                    </div>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ col.empty }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size: 12px; font-weight: 700; color: var(--text-dim); padding: 8px 2px;">— leer —</span>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+      </div>
+
+      <!-- ===== HEUTE INPUT (footer) ===== -->
+      <sc-if value="{{ isHeute }}" hint-placeholder-val="{{ false }}">
+        <div style="flex-shrink: 0; padding: 8px 14px 10px; background: var(--nav-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid var(--border); position: relative;">
+          <sc-if value="{{ dailySuggestOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position: absolute; bottom: 100%; left: 14px; right: 14px; margin-bottom: 6px; background: var(--bg-pop); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); padding: 6px; display: flex; flex-direction: column; z-index: 20;">
+              <sc-for list="{{ dailySuggestions }}" as="s" hint-placeholder-count="2">
+                <div onClick="{{ s.pick }}" style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; cursor: pointer;" style-hover="background: var(--row-hover)">
+                  <span style="width: 28px; height: 28px; border-radius: 50%; background: {{ s.color }}; color: white; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">{{ s.badge }}</span>
+                  <span style="font-size: 14px; font-weight: 800;">{{ s.label }}</span>
+                  <span style="margin-left: auto; font-size: 12px; color: var(--text-dim);">{{ s.sub }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <div style="display: flex; align-items: center; gap: 10px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 99px; padding: 7px 7px 7px 18px;">
+            <input ref="{{ dailyRef }}" value="{{ dailyDraft }}" onChange="{{ onDailyChange }}" onKeyDown="{{ onDailyKey }}" placeholder="Kurzes für heute … „Pakete @Michi&quot;" style="flex: 1; min-width: 0; background: transparent; border: none; outline: none; font-size: 14px; font-family: inherit; font-weight: 600; color: var(--text);">
+            <span onClick="{{ addDaily }}" style="width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 16px; cursor: pointer; flex-shrink: 0;">↑</span>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ===== BOTTOM TAB BAR ===== -->
+      <div style="flex-shrink: 0; display: flex; padding: 8px 24px 30px; background: var(--nav-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid var(--border);">
+        <sc-for list="{{ tabItems }}" as="tab" hint-placeholder-count="3">
+          <div onClick="{{ tab.pick }}" style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; color: {{ tab.color }};">
+            <span style="position: relative;">{{ tab.icon }}
+              <sc-if value="{{ tab.badge }}" hint-placeholder-val="{{ false }}">
+                <span style="position: absolute; top: -4px; right: -8px; min-width: 16px; height: 16px; border-radius: 99px; background: var(--accent); color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0 4px; border: 2px solid var(--bg);">{{ tab.badge }}</span>
+              </sc-if>
+            </span>
+            <span style="font-size: 11px; font-weight: 800;">{{ tab.label }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- ===== BOTTOM SHEETS ===== -->
+      <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ closeSheets }}" style="position: absolute; inset: 0; background: oklch(0 0 0 / 0.45); z-index: 40;"></div>
+      </sc-if>
+
+      <!-- todo actions sheet -->
+      <sc-if value="{{ menuTodo }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ stop }}" style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 41; background: var(--bg-pop); border-radius: 22px 22px 0 0; box-shadow: var(--shadow); padding: 10px 12px 34px; display: flex; flex-direction: column;">
+          <span style="align-self: center; width: 38px; height: 4px; border-radius: 99px; background: var(--border); margin: 4px 0 10px;"></span>
+          <span style="font-size: 13px; font-weight: 800; color: var(--text-dim); padding: 4px 12px 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ menuTodo.plainTitle }}</span>
+          <span onClick="{{ menuTodo.startEdit }}" style="font-size: 16px; font-weight: 700; padding: 13px 14px; border-radius: 12px; cursor: pointer;" style-hover="background: var(--row-hover)">Bearbeiten</span>
+          <span style="font-size: 12px; font-weight: 800; color: var(--text-dim); padding: 10px 14px 6px; text-transform: uppercase; letter-spacing: 0.06em;">Wartet auf …</span>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; padding: 0 14px 6px;">
+            <sc-for list="{{ menuTodo.waitOptions }}" as="c" hint-placeholder-count="2">
+              <span onClick="{{ c.pick }}" style="display: flex; align-items: center; gap: 8px; background: {{ c.bg }}; border: 1px solid {{ c.border }}; border-radius: 99px; padding: 6px 12px 6px 6px; cursor: pointer;">
+                <span style="width: 26px; height: 26px; border-radius: 50%; background: {{ c.color }}; color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center;">{{ c.initials }}</span>
+                <span style="font-size: 13px; font-weight: 700; color: {{ c.fg }};">{{ c.name }}</span>
+              </span>
+            </sc-for>
+            <span onClick="{{ menuTodo.clearWait }}" style="display: flex; align-items: center; gap: 8px; border: 1px dashed var(--border); border-radius: 99px; padding: 6px 14px; cursor: pointer; color: var(--text-dim); font-size: 13px; font-weight: 700;">Niemand</span>
+          </div>
+          <span onClick="{{ menuTodo.remove }}" style="font-size: 16px; font-weight: 700; padding: 13px 14px; border-radius: 12px; cursor: pointer; color: var(--danger);" style-hover="background: var(--row-hover)">Löschen</span>
+        </div>
+      </sc-if>
+
+      <!-- board move sheet -->
+      <sc-if value="{{ moveSheet }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ stop }}" style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 41; background: var(--bg-pop); border-radius: 22px 22px 0 0; box-shadow: var(--shadow); padding: 10px 12px 34px; display: flex; flex-direction: column;">
+          <span style="align-self: center; width: 38px; height: 4px; border-radius: 99px; background: var(--border); margin: 4px 0 10px;"></span>
+          <span style="font-size: 13px; font-weight: 800; color: var(--text-dim); padding: 4px 12px 8px;">Verschieben nach …</span>
+          <sc-for list="{{ moveSheet }}" as="m" hint-placeholder-count="3">
+            <span onClick="{{ m.pick }}" style="display: flex; align-items: center; gap: 10px; padding: 13px 14px; border-radius: 12px; cursor: pointer;" style-hover="background: var(--row-hover)">
+              <sc-if value="{{ m.hasAvatar }}" hint-placeholder-val="{{ false }}">
+                <span style="width: 26px; height: 26px; border-radius: 50%; background: {{ m.avatarColor }}; color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center;">{{ m.avatarInitials }}</span>
+              </sc-if>
+              <span style="font-size: 15px; font-weight: 700;">{{ m.label }}</span>
+            </span>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- space sheet -->
+      <sc-if value="{{ spaceSheetOpen }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ stop }}" style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 41; background: var(--bg-pop); border-radius: 22px 22px 0 0; box-shadow: var(--shadow); padding: 10px 12px 34px; display: flex; flex-direction: column;">
+          <span style="align-self: center; width: 38px; height: 4px; border-radius: 99px; background: var(--border); margin: 4px 0 10px;"></span>
+          <span style="font-size: 13px; font-weight: 800; color: var(--text-dim); padding: 4px 12px 8px;">Mitglieder von {{ activeName }}</span>
+          <sc-for list="{{ inviteOptions }}" as="c" hint-placeholder-count="3">
+            <span onClick="{{ c.pick }}" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; cursor: pointer;" style-hover="background: var(--row-hover)">
+              <span style="width: 30px; height: 30px; border-radius: 50%; background: {{ c.color }}; color: white; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center;">{{ c.initials }}</span>
+              <span style="font-size: 15px; font-weight: 700;">{{ c.name }}</span>
+              <span style="margin-left: auto; font-size: 16px; font-weight: 900; color: var(--accent);">{{ c.mark }}</span>
+            </span>
+          </sc-for>
+          <div style="height: 1px; background: var(--border); margin: 8px 14px;"></div>
+          <span style="font-size: 13px; font-weight: 800; color: var(--text-dim); padding: 4px 12px 8px;">Neuer Space</span>
+          <div onClick="{{ stop }}" style="display: flex; align-items: center; gap: 10px; padding: 0 14px;">
+            <input value="{{ spaceDraft }}" onChange="{{ onSpaceDraft }}" onKeyDown="{{ onSpaceKey }}" placeholder="Name …" style="flex: 1; min-width: 0; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; outline: none; font-size: 14px; font-family: inherit; font-weight: 700; color: var(--text); padding: 10px 12px;">
+            <span onClick="{{ addSpace }}" style="font-size: 13px; font-weight: 800; background: var(--accent); color: white; border-radius: 10px; padding: 11px 16px; cursor: pointer; flex-shrink: 0;">Anlegen</span>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- toast -->
+      <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+        <div style="position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); background: var(--bg-pop); color: var(--text); border: 1px solid var(--border); border-radius: 12px; padding: 11px 18px; font-size: 13px; font-weight: 700; box-shadow: var(--shadow); z-index: 50; max-width: 86%; text-align: center;">{{ toast }}</div>
+      </sc-if>
+
+    </div>
+
+  </x-import>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.contacts = {
+      me:    { id: 'me',    name: 'Martin Videc', short: 'Martin', initials: 'MV', color: 'oklch(0.72 0.15 200)' },
+      michi: { id: 'michi', name: 'Michi Tu',     short: 'Michi',  initials: 'MT', color: 'oklch(0.72 0.15 40)' },
+      jan:   { id: 'jan',   name: 'Jan Huber',    short: 'Jan',    initials: 'J',  color: 'oklch(0.65 0.14 300)' },
+      lisa:  { id: 'lisa',  name: 'Lisa Videc',   short: 'Lisa',   initials: 'LV', color: 'oklch(0.7 0.13 160)' },
+    };
+    this.palette = ['oklch(0.72 0.15 200)', 'oklch(0.72 0.15 40)', 'oklch(0.65 0.14 300)', 'oklch(0.7 0.13 160)'];
+    const today = this.todayStr();
+    let data = null;
+    try { data = JSON.parse(localStorage.getItem('aidoF-mobile')); } catch (e) {}
+    if (!data || !Array.isArray(data.spaces) || !data.spaces.length) {
+      data = {
+        activeSpace: 'mm',
+        spaces: [
+          { id: 'privat', name: 'Privat', color: 'oklch(0.65 0.14 300)', members: ['me'], daily: [], todos: [
+            { id: 1, title: 'Wohnung online inserieren #wohnung', body: '', completed: false, waitingOn: null },
+          ] },
+          { id: 'mm', name: 'Martin & Michi', color: 'oklch(0.72 0.15 200)', members: ['me', 'michi'], daily: [
+            { id: 101, text: 'Müll rausbringen', completed: false, date: today, author: 'me' },
+            { id: 104, text: 'Kannst du heute die Pakete annehmen? @Martin', completed: false, date: today, author: 'michi' },
+            { id: 102, text: 'Einkaufszettel an @Michi schicken', completed: true, date: today, author: 'me' },
+            { id: 103, text: 'Pflanzen gießen', completed: false, date: '2026-06-11', author: 'me' },
+          ], todos: [
+            { id: 2, title: 'Aido Crash Kurs mit @Michi vorbereiten #aido', body: '# Agenda\n- Login und Kontakte zeigen\n- [x] Termin mit @Michi abstimmen\n- [ ] Demo-Account anlegen\n- [ ] Kurze Intro-Folien', completed: false, waitingOn: null },
+            { id: 3, title: 'Hautarzt-Termin klären #gesundheit', body: '', completed: false, waitingOn: 'michi' },
+            { id: 4, title: 'Couchtisch abräumen! #haushalt', body: '', completed: true, waitingOn: null },
+          ] },
+          { id: 'fam', name: 'Familie', color: 'oklch(0.72 0.15 40)', members: ['me', 'jan', 'lisa'], daily: [], todos: [
+            { id: 5, title: 'Geschenk für Oma besorgen', body: '- [ ] Ideen sammeln\n- [ ] Budget mit @Jan klären', completed: false, waitingOn: 'jan' },
+            { id: 6, title: 'Sonntagsessen planen', body: '', completed: false, waitingOn: null },
+          ] },
+        ],
+      };
+    }
+    let migrated = false;
+    data.spaces.forEach(sp => (sp.daily || []).forEach(d => { if (!d.author) { d.author = 'me'; migrated = true; } }));
+    if (migrated) {
+      const mm = data.spaces.find(sp => sp.id === 'mm');
+      if (mm) mm.daily.push({ id: Date.now(), text: 'Kannst du heute die Pakete annehmen? @Martin', completed: false, date: today, author: 'michi' });
+    }
+    this.state = {
+      spaces: data.spaces,
+      activeSpace: data.activeSpace || data.spaces[0].id,
+      mobileTab: 'todos',
+      draft: '', bodyDraft: '', composerOpen: false,
+      dailyDraft: '',
+      spaceSheetOpen: false, spaceDraft: '',
+      menuId: null,
+      moveCardId: null,
+      editId: null, editTitle: '', editBody: '',
+      expanded: [2],
+      tagFilters: [],
+      groupBy: 'person',
+      showDone: true,
+      toast: null,
+      theme: (typeof localStorage !== 'undefined' && localStorage.getItem('aidoF-theme')) || 'dark',
+    };
+    this.inputRef = React.createRef();
+    this.dailyRef = React.createRef();
+    this.toastTimer = null;
+  }
+
+  componentDidMount() { document.documentElement.dataset.theme = this.state.theme; }
+
+  todayStr() { return new Date().toISOString().slice(0, 10); }
+
+  persist(spaces, activeSpace) {
+    try { localStorage.setItem('aidoF-mobile', JSON.stringify({ spaces: spaces, activeSpace: activeSpace })); } catch (e) {}
+  }
+
+  updateSpaces(fn, extra) {
+    this.setState(s => {
+      const spaces = fn(s.spaces.map(sp => ({ ...sp, members: sp.members.slice(), daily: sp.daily.map(d => ({ ...d })), todos: sp.todos.map(t => ({ ...t })) })));
+      const next = { spaces: spaces, ...(extra || {}) };
+      this.persist(spaces, next.activeSpace || s.activeSpace);
+      return next;
+    });
+  }
+
+  active() { return this.state.spaces.find(sp => sp.id === this.state.activeSpace) || this.state.spaces[0]; }
+
+  mutateActive(fn) {
+    const id = this.active().id;
+    this.updateSpaces(spaces => spaces.map(sp => sp.id === id ? fn(sp) : sp));
+  }
+
+  showToast(msg) {
+    clearTimeout(this.toastTimer);
+    this.setState({ toast: msg });
+    this.toastTimer = setTimeout(() => this.setState({ toast: null }), 2600);
+  }
+
+  parseTags(text) {
+    const m = (text || '').match(/#([\wäöüÄÖÜß-]+)/g) || [];
+    return [...new Set(m.map(t => t.slice(1).toLowerCase()))];
+  }
+
+  renderTokens(text, opts) {
+    const clickable = !opts || opts.clickableTags !== false;
+    const parts = (text || '').split(/(\s+)/);
+    const children = parts.map((w, i) => {
+      if (/^@[\wäöüÄÖÜß]+/.test(w)) {
+        const c = Object.values(this.contacts).find(c => w.slice(1).toLowerCase().startsWith(c.short.toLowerCase()));
+        if (c) return React.createElement('span', { key: i, title: c.name, style: { color: 'var(--mention)', fontWeight: 800, background: 'var(--mention-bg)', borderRadius: '6px', padding: '1px 5px' } }, w);
+      }
+      if (/^#[\wäöüÄÖÜß-]+/.test(w)) {
+        const tag = w.slice(1).replace(/[^\wäöüÄÖÜß-]+$/, '').toLowerCase();
+        return React.createElement('span', {
+          key: i,
+          onClick: clickable ? (e) => { e.stopPropagation(); this.setState(prev => ({ tagFilters: prev.tagFilters.includes(tag) ? prev.tagFilters : [...prev.tagFilters, tag] })); } : undefined,
+          style: { fontFamily: "'JetBrains Mono', monospace", fontSize: '13px', color: 'var(--tag)', cursor: clickable ? 'pointer' : 'default' },
+        }, w);
+      }
+      return w;
+    });
+    return React.createElement('span', { style: { textDecoration: 'inherit' } }, ...children);
+  }
+
+  toggleCheckLine(todoId, lineIdx) {
+    this.mutateActive(sp => ({
+      ...sp,
+      todos: sp.todos.map(t => {
+        if (t.id !== todoId) return t;
+        const lines = (t.body || '').split('\n');
+        const l = lines[lineIdx];
+        if (/^- \[ \]/.test(l)) lines[lineIdx] = l.replace('- [ ]', '- [x]');
+        else if (/^- \[x\]/i.test(l)) lines[lineIdx] = l.replace(/- \[x\]/i, '- [ ]');
+        return { ...t, body: lines.join('\n') };
+      }),
+    }));
+  }
+
+  renderBody(t) {
+    const lines = (t.body || '').split('\n');
+    const els = lines.map((line, idx) => {
+      const check = line.match(/^- \[( |x)\] ?(.*)$/i);
+      if (check) {
+        const done = check[1].toLowerCase() === 'x';
+        return React.createElement('div', { key: idx, style: { display: 'flex', alignItems: 'center', gap: '10px' } },
+          React.createElement('span', {
+            onClick: (e) => { e.stopPropagation(); this.toggleCheckLine(t.id, idx); },
+            style: { width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 900, color: 'white', background: done ? 'var(--accent)' : 'transparent', border: done ? 'none' : '2px solid var(--check-border)' },
+          }, done ? '✓' : ''),
+          React.createElement('span', { style: { fontSize: '14px', fontWeight: 600, color: done ? 'var(--text-dim)' : 'var(--text)', textDecoration: done ? 'line-through' : 'none' } }, this.renderTokens(check[2], { clickableTags: false }))
+        );
+      }
+      if (/^# /.test(line)) {
+        return React.createElement('div', { key: idx, style: { fontSize: '13px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-dim)', marginTop: idx ? '4px' : 0 } }, line.slice(2));
+      }
+      if (/^- /.test(line)) {
+        return React.createElement('div', { key: idx, style: { display: 'flex', alignItems: 'baseline', gap: '8px' } },
+          React.createElement('span', { style: { width: '5px', height: '5px', borderRadius: '50%', background: 'var(--text-dim)', flexShrink: 0, position: 'relative', top: '-3px' } }),
+          React.createElement('span', { style: { fontSize: '14px', fontWeight: 600 } }, this.renderTokens(line.slice(2), { clickableTags: false }))
+        );
+      }
+      if (!line.trim()) return null;
+      return React.createElement('div', { key: idx, style: { fontSize: '14px', fontWeight: 600, lineHeight: 1.55 } }, this.renderTokens(line, { clickableTags: false }));
+    }).filter(x => x !== null);
+    return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } }, ...els);
+  }
+
+  getSuggestionsFor(draft, pickFn) {
+    const am = draft.match(/(^|\s)@([\wäöüÄÖÜß]*)$/);
+    if (am) {
+      const q = am[2].toLowerCase();
+      const members = this.active().members;
+      return Object.values(this.contacts)
+        .filter(c => c.id !== 'me' && (c.short.toLowerCase().startsWith(q) || c.name.toLowerCase().startsWith(q)))
+        .sort((a, b) => (members.includes(b.id) ? 1 : 0) - (members.includes(a.id) ? 1 : 0))
+        .map(c => ({
+          badge: c.initials, color: c.color, label: '@' + c.short,
+          sub: members.includes(c.id) ? 'im Space' : c.name,
+          pick: (e) => { if (e) e.stopPropagation(); pickFn('@' + c.short); },
+        }));
+    }
+    const hm = draft.match(/(^|\s)#([\wäöüÄÖÜß]*)$/);
+    if (hm) {
+      const q = hm[2].toLowerCase();
+      const known = new Set(['haushalt', 'wohnung', 'gesundheit', 'aido']);
+      this.state.spaces.forEach(sp => sp.todos.forEach(t => this.parseTags(t.title).forEach(tag => known.add(tag))));
+      return [...known].filter(tag => tag.startsWith(q)).sort().slice(0, 5).map(tag => ({
+        badge: '#', color: 'var(--accent)', label: '#' + tag, sub: 'Tag',
+        pick: (e) => { if (e) e.stopPropagation(); pickFn('#' + tag); },
+      }));
+    }
+    return [];
+  }
+
+  getSuggestions() { return this.getSuggestionsFor(this.state.draft, t => this.pickToken(t)); }
+  getDailySuggestions() { return this.getSuggestionsFor(this.state.dailyDraft, t => this.pickDailyToken(t)); }
+
+  pickToken(token) {
+    this.setState(s => ({ draft: s.draft.replace(/[@#][\wäöüÄÖÜß]*$/, token) + ' ' }));
+    setTimeout(() => { if (this.inputRef.current) this.inputRef.current.focus(); }, 0);
+  }
+  pickDailyToken(token) {
+    this.setState(s => ({ dailyDraft: s.dailyDraft.replace(/[@#][\wäöüÄÖÜß]*$/, token) + ' ' }));
+    setTimeout(() => { if (this.dailyRef.current) this.dailyRef.current.focus(); }, 0);
+  }
+
+  addTodoFromDraft() {
+    const title = this.state.draft.trim();
+    if (!title) { this.showToast('Erst einen Titel eintippen.'); return; }
+    const body = this.state.composerOpen ? this.state.bodyDraft.trimEnd() : '';
+    this.mutateActive(sp => ({ ...sp, todos: [{ id: Date.now(), title: title, body: body, completed: false, waitingOn: null }, ...sp.todos] }));
+    this.setState({ draft: '', bodyDraft: '', composerOpen: false });
+  }
+
+  saveEdit() {
+    const title = this.state.editTitle.trim();
+    if (!title) { this.showToast('Ein Todo braucht einen Titel.'); return; }
+    const id = this.state.editId;
+    const body = this.state.editBody.trimEnd();
+    this.mutateActive(sp => ({ ...sp, todos: sp.todos.map(t => t.id === id ? { ...t, title: title, body: body } : t) }));
+    this.setState({ editId: null, editTitle: '', editBody: '' });
+  }
+
+  addDaily() {
+    const text = this.state.dailyDraft.trim();
+    if (!text) { this.showToast('Erst etwas eintippen.'); return; }
+    const today = this.todayStr();
+    this.mutateActive(sp => ({ ...sp, daily: [...sp.daily, { id: Date.now(), text: text, completed: false, date: today, author: 'me' }] }));
+    this.setState({ dailyDraft: '' });
+  }
+
+  decorate(t, sp) {
+    const s = this.state;
+    const checks = (t.body || '').match(/- \[( |x)\]/gi) || [];
+    const doneChecks = checks.filter(c => /x/i.test(c)).length;
+    const wait = t.waitingOn ? this.contacts[t.waitingOn] : null;
+    const expanded = s.expanded.includes(t.id);
+    return {
+      id: t.id,
+      titleEl: this.renderTokens(t.title),
+      plainTitle: t.title,
+      hasBody: !!(t.body || '').trim(),
+      bodyCursor: (t.body || '').trim() ? 'pointer' : 'default',
+      expanded: expanded,
+      chevron: expanded ? '▾' : '▸',
+      bodyEl: expanded ? this.renderBody(t) : null,
+      progress: checks.length ? doneChecks + '/' + checks.length : '',
+      hasWait: !!wait,
+      waitName: wait ? wait.short : '',
+      editing: s.editId === t.id,
+      notEditing: s.editId !== t.id,
+      toggle: (e) => { e.stopPropagation(); this.mutateActive(sp => ({ ...sp, todos: sp.todos.map(x => x.id === t.id ? { ...x, completed: !x.completed } : x) })); },
+      remove: (e) => { e.stopPropagation(); this.mutateActive(sp => ({ ...sp, todos: sp.todos.filter(x => x.id !== t.id) })); this.setState({ menuId: null }); },
+      toggleExpand: (e) => {
+        if (!(t.body || '').trim()) return;
+        e.stopPropagation();
+        this.setState(prev => ({ expanded: prev.expanded.includes(t.id) ? prev.expanded.filter(x => x !== t.id) : [...prev.expanded, t.id] }));
+      },
+      openMenu: (e) => { e.stopPropagation(); this.setState({ menuId: t.id, moveCardId: null, spaceSheetOpen: false }); },
+      startEdit: (e) => { e.stopPropagation(); this.setState({ editId: t.id, editTitle: t.title, editBody: t.body || '', menuId: null }); },
+      clearWait: (e) => { e.stopPropagation(); this.mutateActive(sp => ({ ...sp, todos: sp.todos.map(x => x.id === t.id ? { ...x, waitingOn: null } : x) })); this.setState({ menuId: null }); },
+      waitOptions: sp.members.map(cid => {
+        const c = this.contacts[cid];
+        const on = t.waitingOn === cid;
+        return {
+          name: c.name, initials: c.initials, color: c.color,
+          bg: on ? 'var(--accent-soft)' : 'transparent',
+          border: on ? 'var(--accent)' : 'var(--border)',
+          fg: on ? 'var(--accent-text)' : 'var(--text)',
+          pick: (e) => { e.stopPropagation(); this.mutateActive(sp => ({ ...sp, todos: sp.todos.map(x => x.id === t.id ? { ...x, waitingOn: cid } : x) })); this.setState({ menuId: null }); },
+        };
+      }),
+    };
+  }
+
+  decorateDaily(d) {
+    const author = this.contacts[d.author || 'me'];
+    const mine = author.id === 'me';
+    const target = (d.text.match(/@[\wäöüÄÖÜß]+/g) || [])
+      .map(w => Object.values(this.contacts).find(c => w.slice(1).toLowerCase().startsWith(c.short.toLowerCase())))
+      .find(c => c && c.id !== author.id) || null;
+    let meta = '';
+    if (mine && target) meta = 'du → ' + target.short;
+    else if (!mine && target && target.id === 'me') meta = author.short + ' → dich';
+    else if (!mine) meta = 'von ' + author.short;
+    return {
+      id: d.id,
+      textEl: this.renderTokens(d.text, { clickableTags: false }),
+      completed: d.completed,
+      deco: d.completed ? 'line-through' : 'none',
+      opacity: d.completed ? 0.55 : 1,
+      justify: mine ? 'flex-end' : 'flex-start',
+      alignItems: mine ? 'flex-end' : 'flex-start',
+      bubbleRadius: mine ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+      showAvatar: !mine,
+      authorName: author.name,
+      authorInitials: author.initials,
+      authorColor: author.color,
+      meta: meta,
+      checkBg: d.completed ? 'var(--accent)' : 'transparent',
+      checkBorder: d.completed ? 'none' : '2px solid var(--check-border)',
+      checkMark: d.completed ? '✓' : '',
+      toggle: (e) => { e.stopPropagation(); this.mutateActive(sp => ({ ...sp, daily: sp.daily.map(x => x.id === d.id ? { ...x, completed: !x.completed } : x) })); },
+      remove: (e) => { e.stopPropagation(); this.mutateActive(sp => ({ ...sp, daily: sp.daily.filter(x => x.id !== d.id) })); },
+      moveToList: (e) => {
+        e.stopPropagation();
+        this.mutateActive(sp => ({
+          ...sp,
+          daily: sp.daily.filter(x => x.id !== d.id),
+          todos: [{ id: Date.now(), title: d.text, body: '', completed: false, waitingOn: null }, ...sp.todos],
+        }));
+        this.showToast('In die Liste übernommen.');
+      },
+    };
+  }
+
+  colKeyOf(t) {
+    const s = this.state;
+    return t.completed ? 'done' : (s.groupBy === 'person' ? (t.waitingOn || 'none') : (t.waitingOn ? 'wait' : 'offen'));
+  }
+
+  buildColDefs(sp) {
+    const defs = [];
+    if (this.state.groupBy === 'person') {
+      defs.push({ key: 'none', label: 'Offen' });
+      sp.members.forEach(cid => {
+        const c = this.contacts[cid];
+        defs.push({ key: cid, label: 'bei ' + (cid === 'me' ? 'dir' : c.short), hasAvatar: true, avatarColor: c.color, avatarInitials: c.initials });
+      });
+      defs.push({ key: 'done', label: 'Erledigt' });
+    } else {
+      defs.push({ key: 'offen', label: 'Offen' }, { key: 'wait', label: 'Wartet' }, { key: 'done', label: 'Erledigt' });
+    }
+    return defs;
+  }
+
+  decorateBoardCard(t) {
+    const checks = (t.body || '').match(/- \[( |x)\]/gi) || [];
+    const doneChecks = checks.filter(c => /x/i.test(c)).length;
+    const wait = t.waitingOn ? this.contacts[t.waitingOn] : null;
+    return {
+      id: t.id,
+      titleEl: this.renderTokens(t.title, { clickableTags: false }),
+      deco: t.completed ? 'line-through' : 'none',
+      progress: checks.length ? doneChecks + '/' + checks.length : '',
+      showWait: this.state.groupBy === 'status' && !!wait && !t.completed,
+      waitName: wait ? wait.short : '',
+      checkBg: t.completed ? 'var(--accent)' : 'transparent',
+      checkBorder: t.completed ? 'none' : '2px solid var(--check-border)',
+      checkMark: t.completed ? '✓' : '',
+      toggle: (e) => { e.stopPropagation(); this.mutateActive(sp => ({ ...sp, todos: sp.todos.map(x => x.id === t.id ? { ...x, completed: !x.completed } : x) })); },
+      move: (e) => { e.stopPropagation(); this.setState({ moveCardId: t.id, menuId: null, spaceSheetOpen: false }); },
+    };
+  }
+
+  moveTodoToCol(id, key) {
+    const groupBy = this.state.groupBy;
+    const members = this.active().members;
+    this.mutateActive(sp => ({
+      ...sp,
+      todos: sp.todos.map(t => {
+        if (t.id !== id) return t;
+        if (key === 'done') return { ...t, completed: true };
+        if (groupBy === 'person') {
+          if (key === 'none') return { ...t, completed: false, waitingOn: null };
+          return { ...t, completed: false, waitingOn: key };
+        }
+        if (key === 'offen') return { ...t, completed: false, waitingOn: null };
+        const fallback = members.find(c => c !== 'me') || members[0] || null;
+        return { ...t, completed: false, waitingOn: t.waitingOn || fallback };
+      }),
+    }));
+    this.setState({ moveCardId: null });
+  }
+
+  icon(name, color) {
+    const s = { display: 'block' };
+    if (name === 'heute') return React.createElement('svg', { width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', style: s },
+      React.createElement('path', { d: 'M4 5a2 2 0 012-2h12a2 2 0 012 2v9a2 2 0 01-2 2H9l-4 4V5z', stroke: color, strokeWidth: 2, strokeLinejoin: 'round' }));
+    if (name === 'todos') return React.createElement('svg', { width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', style: s },
+      React.createElement('path', { d: 'M4 6h16M4 12h16M4 18h10', stroke: color, strokeWidth: 2, strokeLinecap: 'round' }));
+    return React.createElement('svg', { width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', style: s },
+      React.createElement('rect', { x: 4, y: 4, width: 5, height: 16, rx: 1.5, stroke: color, strokeWidth: 2 }),
+      React.createElement('rect', { x: 11, y: 4, width: 5, height: 11, rx: 1.5, stroke: color, strokeWidth: 2 }),
+      React.createElement('rect', { x: 18, y: 4, width: 2.5, height: 8, rx: 1.2, stroke: color, strokeWidth: 1.6 }));
+  }
+
+  renderVals() {
+    const s = this.state;
+    const active = this.active();
+    const today = this.todayStr();
+    const matchTag = t => { const tags = this.parseTags(t.title); return s.tagFilters.every(tag => tags.includes(tag)); };
+    const visible = active.todos.filter(matchTag);
+    const openList = visible.filter(t => !t.completed);
+    const open = openList.map(t => this.decorate(t, active));
+    const done = visible.filter(t => t.completed).map(t => this.decorate(t, active));
+    const todayItems = active.daily.filter(d => d.date === today).map(d => this.decorateDaily(d));
+    const leftovers = active.daily.filter(d => d.date !== today && !d.completed).map(d => this.decorateDaily(d));
+    const suggestions = this.getSuggestions();
+    const dailySugg = this.getDailySuggestions();
+
+    const colDefs = this.buildColDefs(active);
+    const boardCols = colDefs.map(def => {
+      const cards = visible.filter(t => this.colKeyOf(t) === def.key).map(t => this.decorateBoardCard(t));
+      return { ...def, cards: cards, count: cards.length || '', empty: cards.length === 0 };
+    });
+
+    // counts for tab badges
+    const todoOpenCount = active.todos.filter(t => !t.completed).length;
+    const dailyOpen = todayItems.filter(d => !d.completed).length;
+
+    // move sheet
+    let moveSheet = null;
+    if (s.moveCardId != null) {
+      const card = active.todos.find(t => t.id === s.moveCardId);
+      if (card) {
+        const cur = this.colKeyOf(card);
+        moveSheet = colDefs.filter(d => d.key !== cur).map(d => ({
+          label: d.label, hasAvatar: !!d.hasAvatar, avatarColor: d.avatarColor, avatarInitials: d.avatarInitials,
+          pick: (e) => { e.stopPropagation(); this.moveTodoToCol(s.moveCardId, d.key); },
+        }));
+      }
+    }
+
+    // todo actions sheet
+    const menuTodo = s.menuId != null ? (open.concat(done).find(t => t.id === s.menuId) || null) : null;
+
+    const tabs = [
+      { key: 'heute', label: 'Heute', badge: dailyOpen || '' },
+      { key: 'todos', label: 'Todos', badge: todoOpenCount || '' },
+      { key: 'board', label: 'Board', badge: '' },
+    ];
+
+    return {
+      deviceDark: s.theme === 'dark',
+      knobMl: s.theme === 'dark' ? '18px' : '0px',
+      toggleTheme: (e) => {
+        e.stopPropagation();
+        const t = s.theme === 'dark' ? 'light' : 'dark';
+        document.documentElement.dataset.theme = t;
+        try { localStorage.setItem('aidoF-theme', t); } catch (err) {}
+        this.setState({ theme: t });
+      },
+
+      activeName: active.name,
+      activeColor: active.color,
+      memberAvatars: active.members.map((cid, i) => {
+        const c = this.contacts[cid];
+        return { name: c.name, initials: c.initials, color: c.color, ml: i ? '-8px' : '0px' };
+      }),
+
+      spacePills: s.spaces.map(sp => {
+        const isActive = sp.id === active.id;
+        return {
+          name: sp.name, color: sp.color,
+          count: (sp.todos.filter(t => !t.completed).length + sp.daily.filter(d => !d.completed && d.date === today).length) || '',
+          bg: isActive ? 'var(--accent-soft)' : 'var(--bg-card)',
+          fg: isActive ? 'var(--text)' : 'var(--text-dim)',
+          border: isActive ? 'var(--accent)' : 'var(--border)',
+          weight: isActive ? 800 : 700,
+          pick: (e) => { e.stopPropagation(); this.setState({ activeSpace: sp.id, menuId: null, moveCardId: null, spaceSheetOpen: false, tagFilters: [], draft: '', dailyDraft: '' }); this.persist(s.spaces, sp.id); },
+        };
+      }),
+      openSpaceSheet: (e) => { e.stopPropagation(); this.setState({ spaceSheetOpen: true, menuId: null, moveCardId: null, spaceDraft: '' }); },
+
+      tabItems: tabs.map(t => {
+        const on = s.mobileTab === t.key;
+        const color = on ? 'var(--accent)' : 'var(--text-dim)';
+        return {
+          label: t.label, badge: t.badge, color: color, icon: this.icon(t.key, color),
+          pick: (e) => { e.stopPropagation(); this.setState({ mobileTab: t.key, menuId: null, moveCardId: null }); },
+        };
+      }),
+      isHeute: s.mobileTab === 'heute',
+      isTodos: s.mobileTab === 'todos',
+      isBoard: s.mobileTab === 'board',
+
+      // heute
+      dailyItems: todayItems,
+      leftovers: leftovers,
+      dailyOpenCount: dailyOpen || '',
+      dailyDraft: s.dailyDraft,
+      dailyRef: this.dailyRef,
+      dailySuggestions: dailySugg,
+      dailySuggestOpen: dailySugg.length > 0,
+      onDailyChange: (e) => this.setState({ dailyDraft: e.target.value }),
+      onDailyKey: (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); const sg = this.getDailySuggestions(); if (sg.length) sg[0].pick(); else this.addDaily(); }
+      },
+      addDaily: (e) => { if (e) e.stopPropagation(); this.addDaily(); },
+
+      // todos
+      draft: s.draft,
+      bodyDraft: s.bodyDraft,
+      composerOpen: s.composerOpen,
+      inputRef: this.inputRef,
+      suggestions: suggestions,
+      suggestOpen: suggestions.length > 0,
+      openComposer: (e) => { e.stopPropagation(); this.setState({ composerOpen: !s.composerOpen }); },
+      closeComposer: (e) => { e.stopPropagation(); this.setState({ composerOpen: false, bodyDraft: '' }); },
+      onDraftChange: (e) => this.setState({ draft: e.target.value }),
+      onBodyChange: (e) => this.setState({ bodyDraft: e.target.value }),
+      onDraftKey: (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); const sg = this.getSuggestions(); if (sg.length) sg[0].pick(); else this.addTodoFromDraft(); }
+      },
+      addTodo: (e) => { e.stopPropagation(); this.addTodoFromDraft(); },
+      fmtClick: (e) => { e.stopPropagation(); this.showToast('Formatierung ist im Prototyp dekorativ — in der App übernimmt das TipTap.'); },
+
+      tagChips: (() => {
+        const spaceTags = new Set();
+        active.todos.forEach(t => this.parseTags(t.title).forEach(tag => spaceTags.add(tag)));
+        return [...spaceTags].sort().map(tag => {
+          const on = s.tagFilters.includes(tag);
+          return {
+            label: tag,
+            bg: on ? 'var(--accent)' : 'var(--accent-soft)',
+            color: on ? 'white' : 'var(--accent-text)',
+            border: on ? 'var(--accent)' : 'transparent',
+            pick: (e) => { e.stopPropagation(); this.setState(prev => ({ tagFilters: on ? prev.tagFilters.filter(x => x !== tag) : [...prev.tagFilters, tag] })); },
+          };
+        });
+      })(),
+      hasTags: active.todos.some(t => this.parseTags(t.title).length > 0),
+      hasFilters: s.tagFilters.length > 0,
+      clearFilters: (e) => { e.stopPropagation(); this.setState({ tagFilters: [] }); },
+
+      openTodos: open,
+      doneTodos: done,
+      doneCount: done.length,
+      doneChevron: s.showDone ? '▾' : '▸',
+      showDone: s.showDone,
+      toggleDone: (e) => { e.stopPropagation(); this.setState(prev => ({ showDone: !prev.showDone })); },
+      emptyMsg: open.length ? null : (s.tagFilters.length ? 'Keine offenen Todos mit ' + s.tagFilters.map(t => '#' + t).join(' + ') + '.' : (done.length ? 'Alles erledigt in diesem Space!' : 'Noch keine Todos hier. Leg oben das erste an!')),
+
+      editTitle: s.editTitle,
+      editBody: s.editBody,
+      onEditTitle: (e) => this.setState({ editTitle: e.target.value }),
+      onEditBody: (e) => this.setState({ editBody: e.target.value }),
+      saveEditClick: (e) => { e.stopPropagation(); this.saveEdit(); },
+      cancelEdit: (e) => { e.stopPropagation(); this.setState({ editId: null, editTitle: '', editBody: '' }); },
+
+      // board
+      groupTabs: [['person', 'Nach Person'], ['status', 'Nach Status']].map(([key, label]) => ({
+        label: label,
+        pick: (e) => { e.stopPropagation(); this.setState({ groupBy: key }); },
+        bg: s.groupBy === key ? 'var(--accent)' : 'transparent',
+        color: s.groupBy === key ? 'white' : 'var(--text-dim)',
+      })),
+      boardCols: boardCols,
+
+      // sheets
+      menuTodo: menuTodo,
+      moveSheet: moveSheet,
+      spaceSheetOpen: s.spaceSheetOpen,
+      sheetOpen: menuTodo != null || moveSheet != null || s.spaceSheetOpen,
+      closeSheets: () => this.setState({ menuId: null, moveCardId: null, spaceSheetOpen: false }),
+
+      inviteOptions: Object.values(this.contacts).filter(c => c.id !== 'me').map(c => {
+        const isMember = active.members.includes(c.id);
+        return {
+          name: c.name, initials: c.initials, color: c.color, mark: isMember ? '✓' : '',
+          pick: (e) => {
+            e.stopPropagation();
+            this.mutateActive(sp => {
+              const members = sp.members.slice();
+              const i = members.indexOf(c.id);
+              if (i >= 0) { members.splice(i, 1); return { ...sp, members: members, todos: sp.todos.map(t => t.waitingOn === c.id ? { ...t, waitingOn: null } : t) }; }
+              members.push(c.id);
+              return { ...sp, members: members };
+            });
+          },
+        };
+      }),
+      spaceDraft: s.spaceDraft,
+      onSpaceDraft: (e) => this.setState({ spaceDraft: e.target.value }),
+      onSpaceKey: (e) => { if (e.key === 'Enter') { e.preventDefault(); this.addSpaceFromDraft(); } },
+      addSpace: (e) => { e.stopPropagation(); this.addSpaceFromDraft(); },
+
+      toast: s.toast,
+      stop: (e) => e.stopPropagation(),
+      closeAll: () => {
+        if (s.menuId !== null || s.moveCardId !== null || s.spaceSheetOpen) this.setState({ menuId: null, moveCardId: null, spaceSheetOpen: false });
+      },
+    };
+  }
+
+  addSpaceFromDraft() {
+    const name = this.state.spaceDraft.trim();
+    if (!name) { this.showToast('Bitte einen Namen eingeben.'); return; }
+    const id = 'sp' + Date.now();
+    const color = this.palette[this.state.spaces.length % this.palette.length];
+    this.updateSpaces(spaces => [...spaces, { id: id, name: name, color: color, members: ['me'], daily: [], todos: [] }], { activeSpace: id, spaceSheetOpen: false, spaceDraft: '', tagFilters: [] });
+  }
+}
+</script>
+</body>
+</html>

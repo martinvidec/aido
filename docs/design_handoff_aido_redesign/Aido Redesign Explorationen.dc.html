@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: oklch(0.93 0.006 80); }
+  * { box-sizing: border-box; }
+</style>
+</helmet>
+
+<div style="font-family: Nunito, sans-serif; color: oklch(0.28 0.02 270); padding: 48px 40px 80px; display: flex; flex-direction: column; gap: 56px; max-width: 1200px; margin: 0 auto;">
+
+  <!-- ============ INTRO / ANNAHMEN ============ -->
+  <header style="display: flex; flex-direction: column; gap: 16px; max-width: 820px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="width: 36px; height: 36px; border-radius: 11px; background: oklch(0.72 0.15 40); display: flex; align-items: center; justify-content: center; gap: 5px;">
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: white; display: block;"></span>
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: white; display: block;"></span>
+      </div>
+      <h1 style="font-size: 30px; font-weight: 900; margin: 0;">aido — UI-Redesign: 4 Richtungen</h1>
+    </div>
+    <p style="margin: 0; font-size: 16px; line-height: 1.6;">
+      Annahmen aus deinem Briefing: <strong>radikal neu denken erlaubt</strong>, Dark + Light (Toggle),
+      Stimmung <strong>freundlich &amp; verspielt</strong> passend zum Roboter-Maskottchen, Fokus auf
+      <strong>schnelles Erfassen</strong> und <strong>Teilen / @Mentions</strong>.
+      Zum Rich-Text-Editor: Ich empfehle, ihn aus dem Standardfluss zu nehmen — eine schlanke Eingabezeile
+      mit @&nbsp;und&nbsp;# inline, Formatierung nur bei Bedarf aufklappbar. Das zeigt jede Richtung anders.
+    </p>
+    <p style="margin: 0; font-size: 14px; line-height: 1.6; color: oklch(0.5 0.02 270); border-left: 3px solid oklch(0.72 0.15 200); padding-left: 12px;">
+      Repo analysiert (Next.js 15, Tailwind, TipTap, Firebase): @Mentions + #Tags sind bereits First-Class im
+      Datenmodell — Richtung A bildet das direkt ab. Geteilte Nutzer dürfen serverseitig nur abhaken; Richtung C
+      („Spaces") bräuchte daher eine Erweiterung des Rechtemodells. A, B und D gehen ohne Backend-Änderung.
+      Die Richtungen sind bewusst grob: Es geht ums Mischen &amp; Vergleichen.
+    </p>
+  </header>
+
+  <!-- ============ TOKENS ============ -->
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <h2 style="margin: 0; font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: oklch(0.5 0.02 270);">Vorgeschlagene Basis: Typo + Farben</h2>
+    <div style="background: white; border-radius: 20px; padding: 28px 32px; display: flex; gap: 48px; align-items: center; flex-wrap: wrap; box-shadow: 0 1px 3px oklch(0 0 0 / 0.07);">
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div style="font-size: 26px; font-weight: 900;">Nunito für alles</div>
+        <div style="font-size: 14px; color: oklch(0.5 0.02 270);">rund &amp; freundlich, sehr gut lesbar — <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px;">JetBrains Mono</span> für #tags</div>
+      </div>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: center;">
+          <span style="width: 44px; height: 44px; border-radius: 14px; background: oklch(0.72 0.15 40); display: block;"></span>
+          <span style="font-size: 11px; font-family: 'JetBrains Mono', monospace;">Koralle</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: center;">
+          <span style="width: 44px; height: 44px; border-radius: 14px; background: oklch(0.72 0.15 200); display: block;"></span>
+          <span style="font-size: 11px; font-family: 'JetBrains Mono', monospace;">Teal</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: center;">
+          <span style="width: 44px; height: 44px; border-radius: 14px; background: oklch(0.25 0.02 270); display: block;"></span>
+          <span style="font-size: 11px; font-family: 'JetBrains Mono', monospace;">Tinte</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: center;">
+          <span style="width: 44px; height: 44px; border-radius: 14px; background: oklch(0.975 0.008 80); border: 1px solid oklch(0.88 0.01 80); display: block;"></span>
+          <span style="font-size: 11px; font-family: 'JetBrains Mono', monospace;">Warmweiß</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RICHTUNG A ============ -->
+  <section data-screen-label="Richtung A — Kommandozentrale" style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 800;">A — Kommandozentrale <span style="font-size: 13px; font-weight: 700; color: oklch(0.55 0.02 270);">(dark · behutsamste der vier)</span></h2>
+      <p style="margin: 0; font-size: 14px; color: oklch(0.5 0.02 270);">Eine große Eingabezeile als Herzstück. @Personen und #Tags werden beim Tippen zu Chips. Formatierung steckt hinter „Aa". Liste bleibt Liste — aber ruhig, mit Hover-Aktionen statt Dauer-Buttons.</p>
+    </div>
+    <div style="background: oklch(0.22 0.02 270); border-radius: 20px; overflow: hidden; box-shadow: 0 2px 10px oklch(0 0 0 / 0.15);">
+      <!-- nav -->
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 28px; border-bottom: 1px solid oklch(0.32 0.02 270);">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 28px; height: 28px; border-radius: 9px; background: oklch(0.72 0.15 40); display: flex; align-items: center; justify-content: center; gap: 4px;">
+            <span style="width: 5px; height: 5px; border-radius: 50%; background: white; display: block;"></span>
+            <span style="width: 5px; height: 5px; border-radius: 50%; background: white; display: block;"></span>
+          </div>
+          <span style="font-weight: 900; font-size: 17px; color: oklch(0.95 0.01 80);">aido</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 22px;">
+          <span style="font-size: 14px; font-weight: 700; color: oklch(0.95 0.01 80); border-bottom: 2px solid oklch(0.72 0.15 40); padding-bottom: 2px;">Todos</span>
+          <span style="font-size: 14px; font-weight: 600; color: oklch(0.65 0.02 270); display: flex; align-items: center; gap: 6px;">Mentions <span style="background: oklch(0.72 0.15 40); color: white; font-size: 11px; font-weight: 800; border-radius: 99px; padding: 1px 7px;">2</span></span>
+          <span style="font-size: 14px; font-weight: 600; color: oklch(0.65 0.02 270);">Kontakte</span>
+          <span style="width: 34px; height: 20px; border-radius: 99px; background: oklch(0.35 0.02 270); display: flex; align-items: center; padding: 2px;"><span style="width: 16px; height: 16px; border-radius: 50%; background: oklch(0.85 0.05 80); display: block; margin-left: 14px;"></span></span>
+          <span style="width: 30px; height: 30px; border-radius: 50%; background: oklch(0.72 0.15 200); color: white; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center;">MV</span>
+        </div>
+      </div>
+      <!-- quick add -->
+      <div style="padding: 36px 80px 8px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 12px; background: oklch(0.28 0.02 270); border: 1.5px solid oklch(0.72 0.15 40); border-radius: 16px; padding: 16px 20px;">
+          <span style="width: 22px; height: 22px; border-radius: 50%; border: 2px dashed oklch(0.55 0.05 40); display: block;"></span>
+          <span style="font-size: 16px; color: oklch(0.92 0.01 80); display: flex; align-items: center; gap: 8px;">Hautarzt anrufen
+            <span style="background: oklch(0.72 0.15 200 / 0.25); color: oklch(0.85 0.08 200); font-weight: 800; border-radius: 8px; padding: 2px 8px; font-size: 14px;">@Michi</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: oklch(0.72 0.15 40 / 0.2); color: oklch(0.85 0.08 40); border-radius: 8px; padding: 2px 8px;">#gesundheit</span>
+            <span style="width: 2px; height: 20px; background: oklch(0.72 0.15 40); display: block;"></span>
+          </span>
+          <span style="margin-left: auto; display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 13px; font-weight: 700; color: oklch(0.6 0.02 270);">Aa</span>
+            <span style="font-size: 12px; font-family: 'JetBrains Mono', monospace; color: oklch(0.55 0.02 270); border: 1px solid oklch(0.4 0.02 270); border-radius: 6px; padding: 2px 7px;">↵</span>
+          </span>
+        </div>
+        <div style="display: flex; gap: 8px; padding-left: 8px;">
+          <span style="font-size: 12px; color: oklch(0.55 0.02 270);">Vorschläge:</span>
+          <span style="font-size: 12px; font-weight: 700; color: oklch(0.8 0.06 200);">@Michi Tu</span>
+          <span style="font-size: 12px; font-family: 'JetBrains Mono', monospace; color: oklch(0.75 0.06 40);">#haushalt</span>
+          <span style="font-size: 12px; font-family: 'JetBrains Mono', monospace; color: oklch(0.75 0.06 40);">#wohnung</span>
+        </div>
+      </div>
+      <!-- filter + list -->
+      <div style="padding: 20px 80px 40px; display: flex; flex-direction: column; gap: 18px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 13px; font-weight: 800; background: oklch(0.95 0.01 80); color: oklch(0.25 0.02 270); border-radius: 99px; padding: 5px 14px;">Alle</span>
+          <span style="font-size: 13px; font-weight: 700; color: oklch(0.65 0.02 270); border-radius: 99px; padding: 5px 14px; border: 1px solid oklch(0.35 0.02 270);">Meine</span>
+          <span style="font-size: 13px; font-weight: 700; color: oklch(0.65 0.02 270); border-radius: 99px; padding: 5px 14px; border: 1px solid oklch(0.35 0.02 270);">Geteilt</span>
+          <span style="margin-left: auto; font-size: 13px; font-family: 'JetBrains Mono', monospace; color: oklch(0.6 0.02 270);">#tag filtern…</span>
+        </div>
+        <div style="display: flex; flex-direction: column;">
+          <!-- row -->
+          <div style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px; background: oklch(0.26 0.02 270);">
+            <span style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid oklch(0.55 0.03 270); display: block; flex-shrink: 0;"></span>
+            <span style="font-size: 15px; color: oklch(0.93 0.01 80);">Aido Crash Kurs mit <span style="color: oklch(0.8 0.08 200); font-weight: 800;">@Michi</span> vorbereiten</span>
+            <span style="margin-left: auto; display: flex; align-items: center; gap: 12px;">
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: oklch(0.75 0.06 40);">#aido</span>
+              <span style="display: flex;">
+                <span style="width: 24px; height: 24px; border-radius: 50%; background: oklch(0.72 0.15 200); color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid oklch(0.26 0.02 270);">MV</span>
+                <span style="width: 24px; height: 24px; border-radius: 50%; background: oklch(0.72 0.15 40); color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid oklch(0.26 0.02 270); margin-left: -8px;">MT</span>
+              </span>
+              <span style="color: oklch(0.6 0.02 270); font-weight: 900; letter-spacing: 2px;">…</span>
+            </span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 14px; padding: 14px 16px;">
+            <span style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid oklch(0.55 0.03 270); display: block; flex-shrink: 0;"></span>
+            <span style="font-size: 15px; color: oklch(0.93 0.01 80);">Wohnung online inserieren</span>
+            <span style="margin-left: auto; display: flex; align-items: center; gap: 12px;">
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: oklch(0.75 0.06 40);">#wohnung</span>
+              <span style="width: 24px; height: 24px; border-radius: 50%; background: oklch(0.72 0.15 200); color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center;">MV</span>
+            </span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 14px; padding: 14px 16px;">
+            <span style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid oklch(0.55 0.03 270); display: block; flex-shrink: 0;"></span>
+            <span style="font-size: 15px; color: oklch(0.93 0.01 80);">Hautarzt mit Jan <span style="font-size: 12px; font-weight: 700; color: oklch(0.6 0.02 270);">· von Martin geteilt</span></span>
+            <span style="margin-left: auto; display: flex;">
+              <span style="width: 24px; height: 24px; border-radius: 50%; background: oklch(0.72 0.15 200); color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid oklch(0.22 0.02 270);">MV</span>
+              <span style="width: 24px; height: 24px; border-radius: 50%; background: oklch(0.65 0.14 300); color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid oklch(0.22 0.02 270); margin-left: -8px;">J</span>
+            </span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; opacity: 0.5;">
+            <span style="width: 22px; height: 22px; border-radius: 50%; background: oklch(0.72 0.15 40); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: white; font-size: 12px; font-weight: 900;">✓</span>
+            <span style="font-size: 15px; color: oklch(0.93 0.01 80); text-decoration: line-through;">Couchtisch abräumen!</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RICHTUNG B ============ -->
+  <section data-screen-label="Richtung B — Chat mit aido" style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 800;">B — Chat mit aido <span style="font-size: 13px; font-weight: 700; color: oklch(0.55 0.02 270);">(light · radikalste Idee)</span></h2>
+      <p style="margin: 0; font-size: 14px; color: oklch(0.5 0.02 270);">Die App fühlt sich an wie ein Messenger mit dem Roboter: Todos erfassen = aido schreiben. Geteilte Todos und Mentions erscheinen als Nachrichten im Verlauf — Kollaboration wird zum Gespräch.</p>
+    </div>
+    <div style="background: oklch(0.975 0.008 80); border-radius: 20px; overflow: hidden; box-shadow: 0 2px 10px oklch(0 0 0 / 0.1); display: flex; flex-direction: column; height: 620px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 28px; border-bottom: 1px solid oklch(0.9 0.01 80); background: white;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 28px; height: 28px; border-radius: 9px; background: oklch(0.72 0.15 40); display: flex; align-items: center; justify-content: center; gap: 4px;">
+            <span style="width: 5px; height: 5px; border-radius: 50%; background: white; display: block;"></span>
+            <span style="width: 5px; height: 5px; border-radius: 50%; background: white; display: block;"></span>
+          </div>
+          <span style="font-weight: 900; font-size: 17px;">aido</span>
+          <span style="font-size: 12px; font-weight: 700; color: oklch(0.6 0.12 160); background: oklch(0.6 0.12 160 / 0.12); border-radius: 99px; padding: 3px 10px;">online</span>
+        </div>
+        <span style="width: 30px; height: 30px; border-radius: 50%; background: oklch(0.72 0.15 200); color: white; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center;">MV</span>
+      </div>
+      <div style="flex: 1; padding: 24px 60px; display: flex; flex-direction: column; gap: 14px; overflow: hidden;">
+        <!-- aido message -->
+        <div style="display: flex; gap: 10px; align-items: flex-end; max-width: 70%;">
+          <div style="width: 30px; height: 30px; border-radius: 10px; background: oklch(0.72 0.15 40); display: flex; align-items: center; justify-content: center; gap: 4px; flex-shrink: 0;">
+            <span style="width: 5px; height: 5px; border-radius: 50%; background: white; display: block;"></span>
+            <span style="width: 5px; height: 5px; border-radius: 50%; background: white; display: block;"></span>
+          </div>
+          <div style="background: white; border-radius: 18px 18px 18px 6px; padding: 14px 18px; font-size: 15px; line-height: 1.5; box-shadow: 0 1px 2px oklch(0 0 0 / 0.06);">
+            Guten Morgen, Martin! Du hast <strong>3 offene Todos</strong> — eines davon zusammen mit <span style="color: oklch(0.55 0.13 200); font-weight: 800;">@Michi</span>. Womit fangen wir an?
+          </div>
+        </div>
+        <!-- todo cards as messages -->
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-left: 40px; max-width: 65%;">
+          <div style="background: white; border-radius: 14px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 2px oklch(0 0 0 / 0.06);">
+            <span style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid oklch(0.75 0.02 80); display: block;"></span>
+            <span style="font-size: 14px; font-weight: 600;">Aido Crash Kurs mit <span style="color: oklch(0.55 0.13 200); font-weight: 800;">@Michi</span></span>
+            <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: oklch(0.62 0.1 40);">#aido</span>
+          </div>
+          <div style="background: white; border-radius: 14px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 2px oklch(0 0 0 / 0.06);">
+            <span style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid oklch(0.75 0.02 80); display: block;"></span>
+            <span style="font-size: 14px; font-weight: 600;">Wohnung online inserieren</span>
+            <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: oklch(0.62 0.1 40);">#wohnung</span>
+          </div>
+        </div>
+        <!-- shared notification -->
+        <div style="display: flex; gap: 10px; align-items: flex-end; max-width: 70%;">
+          <span style="width: 30px; height: 30px; border-radius: 50%; background: oklch(0.72 0.15 40); color: white; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">MT</span>
+          <div style="background: oklch(0.72 0.15 200 / 0.1); border: 1px solid oklch(0.72 0.15 200 / 0.3); border-radius: 18px 18px 18px 6px; padding: 12px 16px; font-size: 14px;">
+            <strong>Michi</strong> hat dir ein Todo geteilt: <span style="font-weight: 700;">„Hautarzt mit Jan"</span>
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+              <span style="font-size: 12px; font-weight: 800; background: oklch(0.72 0.15 200); color: white; border-radius: 99px; padding: 4px 12px;">Annehmen</span>
+              <span style="font-size: 12px; font-weight: 800; color: oklch(0.5 0.02 270); border: 1px solid oklch(0.85 0.01 80); border-radius: 99px; padding: 4px 12px;">Später</span>
+            </div>
+          </div>
+        </div>
+        <!-- user message -->
+        <div style="align-self: flex-end; background: oklch(0.72 0.15 40); color: white; border-radius: 18px 18px 6px 18px; padding: 12px 18px; font-size: 15px; max-width: 60%;">
+          Couchtisch abräumen ✓ erledigt
+        </div>
+      </div>
+      <div style="padding: 16px 60px 22px; background: oklch(0.975 0.008 80);">
+        <div style="display: flex; align-items: center; gap: 12px; background: white; border-radius: 99px; padding: 12px 20px; box-shadow: 0 2px 8px oklch(0 0 0 / 0.08);">
+          <span style="font-size: 15px; color: oklch(0.6 0.02 270);">Sag aido, was zu tun ist… „Müll rausbringen @Michi morgen"</span>
+          <span style="margin-left: auto; width: 34px; height: 34px; border-radius: 50%; background: oklch(0.72 0.15 40); color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; flex-shrink: 0;">↑</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RICHTUNG C ============ -->
+  <section data-screen-label="Richtung C — Spaces" style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 800;">C — Spaces: Personen zuerst <span style="font-size: 13px; font-weight: 700; color: oklch(0.55 0.02 270);">(dark · Kollaboration als Struktur)</span></h2>
+      <p style="margin: 0; font-size: 14px; color: oklch(0.5 0.02 270);">Statt „My Todos / Shared with Me": Todos leben in <strong>Spaces</strong> (Privat, Martin&nbsp;&amp;&nbsp;Michi, Familie). Access-Verwaltung verschwindet — wer im Space ist, sieht alles. Teilen = Todo in anderen Space ziehen.</p>
+    </div>
+    <div style="background: oklch(0.22 0.02 270); border-radius: 20px; overflow: hidden; box-shadow: 0 2px 10px oklch(0 0 0 / 0.15); display: flex; height: 540px;">
+      <!-- sidebar -->
+      <div style="width: 250px; background: oklch(0.19 0.02 270); padding: 22px 16px; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+        <div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px;">
+          <div style="width: 26px; height: 26px; border-radius: 8px; background: oklch(0.72 0.15 40); display: flex; align-items: center; justify-content: center; gap: 4px;">
+            <span style="width: 4px; height: 4px; border-radius: 50%; background: white; display: block;"></span>
+            <span style="width: 4px; height: 4px; border-radius: 50%; background: white; display: block;"></span>
+          </div>
+          <span style="font-weight: 900; font-size: 16px; color: oklch(0.95 0.01 80);">aido</span>
+        </div>
+        <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: oklch(0.55 0.02 270); padding: 0 8px 4px;">Spaces</span>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; color: oklch(0.8 0.02 270); font-size: 14px; font-weight: 700;">
+          <span style="width: 10px; height: 10px; border-radius: 4px; background: oklch(0.65 0.14 300); display: block;"></span> Privat
+          <span style="margin-left: auto; font-size: 12px; color: oklch(0.55 0.02 270);">1</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: oklch(0.28 0.02 270); color: oklch(0.95 0.01 80); font-size: 14px; font-weight: 800;">
+          <span style="width: 10px; height: 10px; border-radius: 4px; background: oklch(0.72 0.15 200); display: block;"></span> Martin &amp; Michi
+          <span style="margin-left: auto; font-size: 12px; color: oklch(0.65 0.02 270);">3</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; color: oklch(0.8 0.02 270); font-size: 14px; font-weight: 700;">
+          <span style="width: 10px; height: 10px; border-radius: 4px; background: oklch(0.72 0.15 40); display: block;"></span> Familie
+          <span style="margin-left: auto; font-size: 12px; color: oklch(0.55 0.02 270);">2</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: oklch(0.55 0.02 270); font-size: 14px; font-weight: 700;">+ Neuer Space</div>
+        <div style="margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 10px 12px;">
+          <span style="width: 28px; height: 28px; border-radius: 50%; background: oklch(0.72 0.15 200); color: white; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center;">MV</span>
+          <span style="font-size: 13px; font-weight: 700; color: oklch(0.8 0.02 270);">Martin</span>
+        </div>
+      </div>
+      <!-- main -->
+      <div style="flex: 1; padding: 26px 36px; display: flex; flex-direction: column; gap: 18px;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <h3 style="margin: 0; font-size: 22px; font-weight: 900; color: oklch(0.95 0.01 80);">Martin &amp; Michi</h3>
+          <span style="display: flex;">
+            <span style="width: 26px; height: 26px; border-radius: 50%; background: oklch(0.72 0.15 200); color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid oklch(0.22 0.02 270);">MV</span>
+            <span style="width: 26px; height: 26px; border-radius: 50%; background: oklch(0.72 0.15 40); color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid oklch(0.22 0.02 270); margin-left: -8px;">MT</span>
+          </span>
+          <span style="font-size: 12px; font-weight: 700; color: oklch(0.65 0.02 270); border: 1px dashed oklch(0.4 0.02 270); border-radius: 99px; padding: 4px 12px;">+ einladen</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; background: oklch(0.26 0.02 270); border-radius: 14px; padding: 13px 18px;">
+          <span style="color: oklch(0.72 0.15 40); font-weight: 900; font-size: 18px;">+</span>
+          <span style="font-size: 14px; color: oklch(0.6 0.02 270);">Todo in diesem Space anlegen — sehen beide sofort</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 14px; background: oklch(0.26 0.02 270); border-radius: 14px; padding: 14px 18px;">
+            <span style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid oklch(0.55 0.03 270); display: block;"></span>
+            <span style="font-size: 15px; color: oklch(0.93 0.01 80);">Aido Crash Kurs vorbereiten</span>
+            <span style="margin-left: auto; font-size: 12px; font-weight: 700; color: oklch(0.65 0.02 270);">zugewiesen an</span>
+            <span style="width: 24px; height: 24px; border-radius: 50%; background: oklch(0.72 0.15 40); color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center;">MT</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 14px; background: oklch(0.26 0.02 270); border-radius: 14px; padding: 14px 18px;">
+            <span style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid oklch(0.55 0.03 270); display: block;"></span>
+            <span style="font-size: 15px; color: oklch(0.93 0.01 80);">Hautarzt mit Jan</span>
+            <span style="margin-left: auto; font-size: 12px; font-weight: 700; color: oklch(0.65 0.02 270);">zugewiesen an</span>
+            <span style="width: 24px; height: 24px; border-radius: 50%; background: oklch(0.72 0.15 200); color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center;">MV</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 14px; background: oklch(0.26 0.02 270); border-radius: 14px; padding: 14px 18px; opacity: 0.5;">
+            <span style="width: 22px; height: 22px; border-radius: 50%; background: oklch(0.72 0.15 40); display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: 900;">✓</span>
+            <span style="font-size: 15px; color: oklch(0.93 0.01 80); text-decoration: line-through;">Couchtisch abräumen!</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RICHTUNG D ============ -->
+  <section data-screen-label="Richtung D — Karten" style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 800;">D — Bunte Karten <span style="font-size: 13px; font-weight: 700; color: oklch(0.55 0.02 270);">(light · am verspieltesten)</span></h2>
+      <p style="margin: 0; font-size: 14px; color: oklch(0.5 0.02 270);">Todos als Haftnotiz-Karten im Grid, Tag bestimmt die Pastellfarbe. Große Checkboxen, leichte Rotation, eine „+"-Karte zum Anlegen. Geteilte Karten tragen die Avatare unten.</p>
+    </div>
+    <div style="background: oklch(0.975 0.008 80); border-radius: 20px; overflow: hidden; box-shadow: 0 2px 10px oklch(0 0 0 / 0.1); padding: 28px 36px 40px; display: flex; flex-direction: column; gap: 24px;">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 28px; height: 28px; border-radius: 9px; background: oklch(0.72 0.15 40); display: flex; align-items: center; justify-content: center; gap: 4px;">
+            <span style="width: 5px; height: 5px; border-radius: 50%; background: white; display: block;"></span>
+            <span style="width: 5px; height: 5px; border-radius: 50%; background: white; display: block;"></span>
+          </div>
+          <span style="font-weight: 900; font-size: 17px;">aido</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: oklch(0.72 0.15 40 / 0.12); color: oklch(0.55 0.12 40); border-radius: 99px; padding: 5px 12px;">#aido</span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: oklch(0.72 0.15 200 / 0.12); color: oklch(0.5 0.1 200); border-radius: 99px; padding: 5px 12px;">#gesundheit</span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: oklch(0.65 0.14 300 / 0.12); color: oklch(0.5 0.12 300); border-radius: 99px; padding: 5px 12px;">#wohnung</span>
+          <span style="width: 30px; height: 30px; border-radius: 50%; background: oklch(0.72 0.15 200); color: white; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; margin-left: 8px;">MV</span>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px;">
+        <div style="background: oklch(0.93 0.05 40); border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 14px; min-height: 170px; transform: rotate(-1deg); box-shadow: 0 3px 8px oklch(0 0 0 / 0.07);">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: oklch(0.5 0.12 40); font-weight: 600;">#aido</span>
+          <span style="font-size: 16px; font-weight: 800; line-height: 1.35;">Aido Crash Kurs mit <span style="text-decoration: underline; text-decoration-color: oklch(0.72 0.15 200); text-decoration-thickness: 2px;">@Michi</span></span>
+          <div style="margin-top: auto; display: flex; align-items: center; justify-content: space-between;">
+            <span style="display: flex;">
+              <span style="width: 24px; height: 24px; border-radius: 50%; background: oklch(0.72 0.15 200); color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid oklch(0.93 0.05 40);">MV</span>
+              <span style="width: 24px; height: 24px; border-radius: 50%; background: oklch(0.72 0.15 40); color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid oklch(0.93 0.05 40); margin-left: -8px;">MT</span>
+            </span>
+            <span style="width: 28px; height: 28px; border-radius: 50%; border: 2.5px solid oklch(0.4 0.06 40); display: block;"></span>
+          </div>
+        </div>
+        <div style="background: oklch(0.93 0.04 200); border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 14px; min-height: 170px; transform: rotate(1deg); box-shadow: 0 3px 8px oklch(0 0 0 / 0.07);">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: oklch(0.45 0.09 200); font-weight: 600;">#gesundheit</span>
+          <span style="font-size: 16px; font-weight: 800; line-height: 1.35;">Hautarzt mit Jan</span>
+          <div style="margin-top: auto; display: flex; align-items: center; justify-content: space-between;">
+            <span style="display: flex;">
+              <span style="width: 24px; height: 24px; border-radius: 50%; background: oklch(0.72 0.15 200); color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid oklch(0.93 0.04 200);">MV</span>
+              <span style="width: 24px; height: 24px; border-radius: 50%; background: oklch(0.65 0.14 300); color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid oklch(0.93 0.04 200); margin-left: -8px;">J</span>
+            </span>
+            <span style="width: 28px; height: 28px; border-radius: 50%; border: 2.5px solid oklch(0.4 0.05 200); display: block;"></span>
+          </div>
+        </div>
+        <div style="background: oklch(0.93 0.04 300); border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 14px; min-height: 170px; transform: rotate(-0.5deg); box-shadow: 0 3px 8px oklch(0 0 0 / 0.07);">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: oklch(0.45 0.1 300); font-weight: 600;">#wohnung</span>
+          <span style="font-size: 16px; font-weight: 800; line-height: 1.35;">Wohnung online inserieren</span>
+          <div style="margin-top: auto; display: flex; align-items: center; justify-content: space-between;">
+            <span style="width: 24px; height: 24px; border-radius: 50%; background: oklch(0.72 0.15 200); color: white; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center;">MV</span>
+            <span style="width: 28px; height: 28px; border-radius: 50%; border: 2.5px solid oklch(0.4 0.06 300); display: block;"></span>
+          </div>
+        </div>
+        <div style="border: 2.5px dashed oklch(0.8 0.02 80); border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 170px; color: oklch(0.6 0.02 270);">
+          <span style="font-size: 30px; font-weight: 900; color: oklch(0.72 0.15 40);">+</span>
+          <span style="font-size: 13px; font-weight: 700;">Neue Karte</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; opacity: 0.55;">
+        <span style="width: 26px; height: 26px; border-radius: 50%; background: oklch(0.72 0.15 40); display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; font-weight: 900;">✓</span>
+        <span style="font-size: 14px; font-weight: 700; text-decoration: line-through;">Couchtisch abräumen!</span>
+        <span style="font-size: 12px; color: oklch(0.55 0.02 270);">· Erledigte einklappbar am Seitenende</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ NEXT STEPS ============ -->
+  <footer style="background: white; border-radius: 20px; padding: 28px 32px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 1px 3px oklch(0 0 0 / 0.07); max-width: 820px;">
+    <h2 style="margin: 0; font-size: 17px; font-weight: 800;">Nächste Schritte</h2>
+    <p style="margin: 0; font-size: 14px; line-height: 1.7; color: oklch(0.45 0.02 270);">
+      1 — Sag mir, welche Richtung (oder Mischung) dir gefällt: z.&nbsp;B. „A als Basis, aber mit den Spaces aus C".<br>
+      2 — GitHub verbinden, damit ich Stack &amp; Komponenten der echten App berücksichtige.<br>
+      3 — Dann baue ich die gewählte Richtung als <strong>interaktiven Prototyp</strong> aus: Todos anlegen, abhaken, @Mention-Autocomplete, Dark/Light-Toggle live.
+    </p>
+  </footer>
+
+</div>
+</x-dc>
+</body>
+</html>
