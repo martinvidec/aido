@@ -2,17 +2,22 @@
 
 import React from "react";
 import { SpacesProvider } from "@/lib/contexts/SpacesContext";
+import { ToastProvider } from "@/lib/contexts/ToastContext";
 import DesktopShell from "./DesktopShell";
+import MobileShell from "./MobileShell";
 
 /**
- * Entry point for the redesigned workspace (issue #42). Provides the spaces
- * state and renders the desktop shell. The responsive mobile shell is added in
- * issue #43 (a layout switch will choose desktop vs. mobile here).
+ * Entry point for the redesigned workspace (issues #42/#43). Provides spaces +
+ * toast state and renders both shells; CSS handles the responsive switch
+ * (desktop is `md:flex`, mobile is `md:hidden`), avoiding hydration mismatch.
  */
 export default function AppShell() {
   return (
-    <SpacesProvider>
-      <DesktopShell />
-    </SpacesProvider>
+    <ToastProvider>
+      <SpacesProvider>
+        <DesktopShell />
+        <MobileShell />
+      </SpacesProvider>
+    </ToastProvider>
   );
 }
