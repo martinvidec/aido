@@ -35,6 +35,8 @@ interface SpacesContextType {
   createSpace: (name: string) => Promise<string | null>;
   addMember: (spaceId: string, uid: string) => Promise<void>;
   removeMember: (spaceId: string, uid: string) => Promise<void>;
+  /** Update one space's open-todo badge locally (e.g. after add/complete). */
+  setOpenCount: (spaceId: string, count: number) => void;
 }
 
 const SpacesContext = createContext<SpacesContextType | undefined>(undefined);
@@ -114,6 +116,10 @@ export const SpacesProvider = ({ children }: { children: ReactNode }) => {
     [refreshSpaces]
   );
 
+  const setOpenCount = useCallback((spaceId: string, count: number) => {
+    setOpenCounts((prev) => ({ ...prev, [spaceId]: count }));
+  }, []);
+
   const activeSpace = spaces.find((s) => s.id === activeSpaceId) ?? null;
 
   const value: SpacesContextType = {
@@ -129,6 +135,7 @@ export const SpacesProvider = ({ children }: { children: ReactNode }) => {
     createSpace,
     addMember,
     removeMember,
+    setOpenCount,
   };
 
   return <SpacesContext.Provider value={value}>{children}</SpacesContext.Provider>;
