@@ -1,12 +1,26 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Nunito, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
 import { ErrorProvider } from "@/lib/contexts/ErrorContext";
 import MainLayoutClientWrapper from "@/components/MainLayoutClientWrapper";
 import { ThemeProvider } from "@/lib/contexts/ThemeContext";
 
-const inter = Inter({ subsets: ["latin"] });
+// UI font (issue #39). Exposed as a CSS variable consumed by globals.css/Tailwind.
+const nunito = Nunito({
+  subsets: ["latin"],
+  weight: ["400", "600", "700", "800", "900"],
+  variable: "--font-nunito",
+  display: "swap",
+});
+
+// Monospace for #tags and numbers (issue #39).
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "600"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Aido - Your Todo App",
@@ -20,7 +34,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className} bg-white dark:bg-gray-900 transition-colors duration-200`}>
+      <body className={`${nunito.variable} ${jetbrainsMono.variable}`}>
         <ThemeProvider>
           <AuthProvider>
             <ErrorProvider>
