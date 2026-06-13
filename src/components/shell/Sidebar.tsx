@@ -7,6 +7,7 @@ import { useSpaces } from "@/lib/contexts/SpacesContext";
 import { spaceColorFromHue } from "@/lib/theme/colors";
 import Avatar from "./Avatar";
 import ThemeToggle from "./ThemeToggle";
+import NewSpaceButton from "./NewSpaceButton";
 
 /** aido logo: rounded accent square with two white "robot eyes". */
 function Logo() {
@@ -77,15 +78,7 @@ export default function Sidebar() {
           );
         })}
 
-        {/* "+ Neuer Space" — interactive creation lives in the spaces-management
-            issue (#47); here it is only the placeholder row. */}
-        <button
-          type="button"
-          disabled
-          className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-text-dim"
-        >
-          + Neuer Space
-        </button>
+        <NewSpaceButton />
       </nav>
 
       {/* Footer: current user + settings */}

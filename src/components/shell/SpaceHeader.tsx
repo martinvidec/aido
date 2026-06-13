@@ -6,6 +6,7 @@ import { useMemberProfiles } from "@/lib/hooks/useMemberProfiles";
 import { spaceColorFromHue } from "@/lib/theme/colors";
 import Avatar from "./Avatar";
 import SegmentedControl from "./SegmentedControl";
+import InvitePopover from "./InvitePopover";
 
 export default function SpaceHeader() {
   const { activeSpace } = useSpaces();
@@ -36,14 +37,7 @@ export default function SpaceHeader() {
         ))}
       </div>
 
-      {/* "+ einladen" — invite popover lives in the spaces-management issue (#47). */}
-      <button
-        type="button"
-        disabled
-        className="rounded-full border border-dashed border-border px-3 py-1 text-sm text-text-dim"
-      >
-        + einladen
-      </button>
+      <InvitePopover />
 
       <div className="ml-auto">
         <SegmentedControl />
