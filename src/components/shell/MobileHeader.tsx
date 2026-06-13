@@ -21,17 +21,20 @@ function Logo() {
 }
 
 interface MobileHeaderProps {
-  /** Opens the "+ Space" sheet (creation UI is the spaces-management issue #47). */
+  /** Opens the "+ Space" creation sheet. */
   onAddSpace: () => void;
+  /** Opens the members sheet for the active space (tapping the avatar stack). */
+  onManageMembers: () => void;
 }
 
 /**
  * Fixed mobile header (issue #43): brand + member avatars + theme toggle, with a
  * horizontally scrollable row of space pills underneath. Blurred nav background.
  */
-export default function MobileHeader({ onAddSpace }: MobileHeaderProps) {
+export default function MobileHeader({ onAddSpace, onManageMembers }: MobileHeaderProps) {
   const { spaces, activeSpaceId, activeSpace, openCounts, setActiveSpace } = useSpaces();
   const profiles = useMemberProfiles(activeSpace?.members ?? []);
+  const members = activeSpace?.members ?? [];
 
   return (
     <header
@@ -47,13 +50,20 @@ export default function MobileHeader({ onAddSpace }: MobileHeaderProps) {
         <Logo />
         <span className="text-[17px] font-black">aido</span>
         <div className="ml-auto flex items-center gap-2">
-          <div className="flex items-center">
-            {(activeSpace?.members ?? []).map((uid, i) => (
-              <div key={uid} style={{ marginLeft: i === 0 ? 0 : -8 }}>
-                <Avatar uid={uid} name={profiles[uid]?.displayName} size={26} ring />
-              </div>
-            ))}
-          </div>
+          {members.length > 0 && (
+            <button
+              type="button"
+              onClick={onManageMembers}
+              className="flex items-center"
+              aria-label="Mitglieder verwalten"
+            >
+              {members.map((uid, i) => (
+                <div key={uid} style={{ marginLeft: i === 0 ? 0 : -8 }}>
+                  <Avatar uid={uid} name={profiles[uid]?.displayName} size={26} ring />
+                </div>
+              ))}
+            </button>
+          )}
           <ThemeToggle width={42} height={24} />
         </div>
       </div>

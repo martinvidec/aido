@@ -9,7 +9,13 @@ import React, {
   ReactNode,
 } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { getSpacesForUser, getOpenTodoCount } from "@/lib/firebase/firebaseUtils";
+import {
+  getSpacesForUser,
+  getOpenTodoCount,
+  createSpace as createSpaceDoc,
+  addSpaceMember,
+  removeSpaceMember,
+} from "@/lib/firebase/firebaseUtils";
 import type { Space } from "@/lib/types";
 
 export type SpaceView = "liste" | "board";
@@ -25,6 +31,10 @@ interface SpacesContextType {
   setActiveSpace: (id: string) => void;
   setView: (view: SpaceView) => void;
   refreshSpaces: () => Promise<void>;
+  /** Create a space (creator = first member, cyclic palette color) and select it. */
+  createSpace: (name: string) => Promise<string | null>;
+  addMember: (spaceId: string, uid: string) => Promise<void>;
+  removeMember: (spaceId: string, uid: string) => Promise<void>;
 }
 
 const SpacesContext = createContext<SpacesContextType | undefined>(undefined);
@@ -77,6 +87,33 @@ export const SpacesProvider = ({ children }: { children: ReactNode }) => {
     refreshSpaces();
   }, [refreshSpaces]);
 
+  const createSpace = useCallback(
+    async (name: string): Promise<string | null> => {
+      if (!user || !name.trim()) return null;
+      const id = await createSpaceDoc(user.uid, name, spaces.length);
+      await refreshSpaces();
+      setActiveSpaceId(id);
+      return id;
+    },
+    [user, spaces.length, refreshSpaces]
+  );
+
+  const addMember = useCallback(
+    async (spaceId: string, uid: string) => {
+      await addSpaceMember(spaceId, uid);
+      await refreshSpaces();
+    },
+    [refreshSpaces]
+  );
+
+  const removeMember = useCallback(
+    async (spaceId: string, uid: string) => {
+      await removeSpaceMember(spaceId, uid);
+      await refreshSpaces();
+    },
+    [refreshSpaces]
+  );
+
   const activeSpace = spaces.find((s) => s.id === activeSpaceId) ?? null;
 
   const value: SpacesContextType = {
@@ -89,6 +126,9 @@ export const SpacesProvider = ({ children }: { children: ReactNode }) => {
     setActiveSpace: setActiveSpaceId,
     setView,
     refreshSpaces,
+    createSpace,
+    addMember,
+    removeMember,
   };
 
   return <SpacesContext.Provider value={value}>{children}</SpacesContext.Provider>;
