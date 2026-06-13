@@ -6,7 +6,7 @@ import { User } from "firebase/auth";
 import { auth, db } from "../firebase/firebase";
 import { doc, setDoc, getDoc, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
-import { upsertPublicProfile } from '../firebase/firebaseUtils';
+import { upsertPublicProfile, migrateLegacyTodos } from '../firebase/firebaseUtils';
 import { useTheme } from './ThemeContext';
 import type { Theme as ThemeValue } from './ThemeContext';
 
@@ -58,8 +58,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const firestoreTheme = data.theme || 'system';
               debugLog("Setting theme from Firestore snapshot:", firestoreTheme);
               setTheme(firestoreTheme as ThemeValue);
-              
+
               setUser(authUser);
+
+              // One-time lazy migration of legacy users/{uid}/todos into the
+              // spaces model (issue #48). Guarded by a persisted flag + an
+              // in-flight lock inside migrateLegacyTodos; safe to skip-call.
+              if (!data.todosMigratedToSpacesAt) {
+                migrateLegacyTodos(authUser.uid).catch((error) => {
+                  console.error("Error migrating legacy todos:", error);
+                });
+              }
             } else {
               debugLog("User document does not exist, creating...");
               setDoc(userDocRef, {

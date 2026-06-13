@@ -738,4 +738,141 @@ export const cancelOutgoingRequest = async (
   }
 };
 
+// --- Legacy todo migration (issue #48) ---
+// Lazily migrates a user's old users/{uid}/todos into the new spaces model on
+// login (see AuthContext). Strategy:
+//  - own (non-shared) todos → a default "Privat" space (marker: migratedDefault).
+//  - shared todos (sharedWith) → a "Geteilt" space per distinct member set
+//    (owner + sharees; marker: migratedShareKey), so former sharees regain
+//    access via space membership. Trade-off: a sharee now sees ALL todos the
+//    owner shared with that exact same group (per-space, not per-todo, sharing).
+// Non-destructive: legacy docs are kept and tagged `migratedTo`. Idempotent via
+// the per-user flag, per-todo marker, and per-space markers — safe to re-run
+// (e.g. after a partial failure). Rollback: delete the created spaces and clear
+// the user flag / `migratedTo` markers; the original todos are untouched. Export
+// Firestore before relying on the result.
+
+const TODOS_MIGRATION_FLAG = "todosMigratedToSpacesAt";
+// Guards against concurrent runs within a session (the user-doc snapshot can
+// fire repeatedly before the persisted flag is set).
+const migrationInFlight = new Set<string>();
+
+const firstLine = (text: string): string =>
+  (text || "")
+    .split("\n")
+    .map((s) => s.trim())
+    .find(Boolean) ?? "";
+
+const memberSetKey = (members: string[]): string =>
+  [...new Set(members)].sort().join(",");
+
+export const migrateLegacyTodos = async (uid: string): Promise<void> => {
+  if (!uid || migrationInFlight.has(uid)) return;
+  migrationInFlight.add(uid);
+  try {
+    const userRef = doc(db, "users", uid);
+    const userSnap = await getDoc(userRef);
+    if (userSnap.exists() && userSnap.data()?.[TODOS_MIGRATION_FLAG]) return;
+
+    const legacySnap = await getDocs(collection(db, "users", uid, "todos"));
+    if (legacySnap.empty) {
+      await setDoc(userRef, { [TODOS_MIGRATION_FLAG]: serverTimestamp() }, { merge: true });
+      return;
+    }
+
+    // Reuse migration-marked spaces from a previous (partial) run.
+    const spacesSnap = await getDocs(
+      query(collection(db, SPACES_COLLECTION), where("members", "array-contains", uid))
+    );
+    const ownSpaces = spacesSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as Array<
+      DocumentData & { id: string }
+    >;
+
+    let privatId =
+      ownSpaces.find((s) => s.migratedDefault === true && s.createdBy === uid)?.id ?? null;
+    if (!privatId) {
+      const ref = await addDoc(collection(db, SPACES_COLLECTION), {
+        name: "Privat",
+        color: getSpaceColor(0).hue,
+        members: [uid],
+        createdBy: uid,
+        createdAt: serverTimestamp(),
+        migratedDefault: true,
+      });
+      privatId = ref.id;
+    }
+
+    const sharedByKey = new Map<string, string>();
+    for (const s of ownSpaces) {
+      if (s.migratedShareKey && s.createdBy === uid) sharedByKey.set(s.migratedShareKey, s.id);
+    }
+
+    let migrated = 0;
+    let order = 0;
+    for (const d of legacySnap.docs) {
+      const data = d.data();
+      if (data.migratedTo) continue; // already migrated this todo
+
+      const sharedWith: string[] = Array.isArray(data.sharedWith)
+        ? data.sharedWith.filter((x: unknown) => typeof x === "string" && x && x !== uid)
+        : [];
+
+      let targetSpaceId: string;
+      if (sharedWith.length === 0) {
+        targetSpaceId = privatId;
+      } else {
+        const members = [uid, ...sharedWith];
+        const key = memberSetKey(members);
+        let sid = sharedByKey.get(key);
+        if (!sid) {
+          const ref = await addDoc(collection(db, SPACES_COLLECTION), {
+            name: "Geteilt",
+            color: getSpaceColor(1).hue,
+            members,
+            createdBy: uid,
+            createdAt: serverTimestamp(),
+            migratedShareKey: key,
+          });
+          sid = ref.id;
+          sharedByKey.set(key, sid);
+        }
+        targetSpaceId = sid;
+      }
+
+      const plain = typeof data.text === "string" ? data.text : "";
+      const body =
+        data.content && typeof data.content === "object" ? (data.content as TiptapContent) : null;
+      const title = firstLine(plain) || "(ohne Titel)";
+      const tags =
+        Array.isArray(data.tags) && data.tags.length ? data.tags : deriveTags(title, body);
+      const mentions = Array.isArray(data.mentionedUsers)
+        ? data.mentionedUsers
+        : deriveMentions(body);
+
+      const newTodoRef = await addDoc(collection(db, SPACES_COLLECTION, targetSpaceId, "todos"), {
+        spaceId: targetSpaceId,
+        title,
+        body,
+        completed: data.completed === true,
+        waitingOn: null,
+        tags,
+        mentions,
+        createdBy: uid,
+        createdAt: serverTimestamp(),
+        order: order++,
+      });
+
+      await updateDoc(doc(db, "users", uid, "todos", d.id), {
+        migratedTo: `${SPACES_COLLECTION}/${targetSpaceId}/todos/${newTodoRef.id}`,
+      });
+      migrated++;
+    }
+
+    await setDoc(userRef, { [TODOS_MIGRATION_FLAG]: serverTimestamp() }, { merge: true });
+    console.log(`[migration] Migrated ${migrated} legacy todo(s) into spaces for user ${uid}.`);
+  } finally {
+    migrationInFlight.delete(uid);
+  }
+};
+
 // --- Add other potential functions like getIncomingContactRequests, getContacts etc. later ---
