@@ -232,6 +232,16 @@ await check('member may not set members to a non-list', assertFails(
 await check('member may invite another member', assertSucceeds(
   updateDoc(doc(db(BOB), SPACE_PATH), { members: [ALICE, BOB, MALLORY] })));
 
+// Creator may never be removed from members (issue #64) — otherwise the space
+// is orphaned and undeletable. These run after a reset to a clean [ALICE, BOB].
+await resetSpace();
+await check('member may not remove the creator (orphan)', assertFails(
+  updateDoc(doc(db(BOB), SPACE_PATH), { members: [BOB] })));
+await check('creator may not remove themselves', assertFails(
+  updateDoc(doc(db(ALICE), SPACE_PATH), { members: [BOB] })));
+await check('member may remove a non-creator member', assertSucceeds(
+  updateDoc(doc(db(ALICE), SPACE_PATH), { members: [ALICE] })));
+
 console.log('  delete:');
 await resetSpace();
 await check('non-creator member may not delete the space', assertFails(

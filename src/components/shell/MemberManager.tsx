@@ -38,6 +38,9 @@ export default function MemberManager() {
 
   const toggle = async (uid: string) => {
     if (pending) return;
+    // The creator must stay a member: removing them orphans the space (only the
+    // creator may delete it). firestore.rules enforces this too (issue #64).
+    if (uid === activeSpace.createdBy) return;
     setPending(uid);
     try {
       if (members.includes(uid)) await removeMember(activeSpace.id, uid);
@@ -61,19 +64,28 @@ export default function MemberManager() {
       ) : (
         contacts.map((contact) => {
           const isMember = members.includes(contact.uid);
+          const isCreator = contact.uid === activeSpace.createdBy;
           return (
             <button
               key={contact.uid}
               type="button"
               onClick={() => toggle(contact.uid)}
-              disabled={pending === contact.uid}
-              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-row-hover disabled:opacity-60"
+              disabled={pending === contact.uid || isCreator}
+              title={isCreator ? "Ersteller kann nicht entfernt werden" : undefined}
+              className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-left ${
+                isCreator ? "cursor-default" : "hover:bg-row-hover"
+              } ${pending === contact.uid ? "opacity-60" : ""}`}
               style={{ minHeight: 44 }}
             >
               <Avatar uid={contact.uid} name={contact.displayName} size={26} />
               <span className="flex-1 truncate text-sm font-semibold">
                 {contact.displayName ?? contact.email ?? "Unbekannt"}
               </span>
+              {isCreator && (
+                <span className="text-[10px] font-bold uppercase tracking-wide text-text-dim">
+                  Ersteller
+                </span>
+              )}
               <span
                 className="text-accent"
                 style={{ visibility: isMember ? "visible" : "hidden" }}
