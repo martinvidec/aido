@@ -12,7 +12,7 @@ export default function LoginPage() {
   // Redirect if user is already logged in
   useEffect(() => {
     if (!loading && user) {
-      router.push('/'); // Redirect to home if logged in
+      router.push('/todos'); // Redirect to the redesigned workspace if logged in
     }
   }, [user, loading, router]);
 

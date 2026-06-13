@@ -6,6 +6,7 @@ import MobileHeader from "./MobileHeader";
 import BottomTabs, { type MobileTab } from "./BottomTabs";
 import BottomSheet from "./BottomSheet";
 import MemberManager from "./MemberManager";
+import AccountActions from "./AccountActions";
 import MobileTodos from "./list/MobileTodos";
 import MobileHeute from "./heute/MobileHeute";
 import HeuteInput from "./heute/HeuteInput";
@@ -74,12 +75,14 @@ export default function MobileShell() {
   const [tab, setTab] = useState<MobileTab>("todos");
   const [addSpaceOpen, setAddSpaceOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden bg-bg text-text md:hidden">
       <MobileHeader
         onAddSpace={() => setAddSpaceOpen(true)}
         onManageMembers={() => setMembersOpen(true)}
+        onAccount={() => setAccountOpen(true)}
       />
 
       <div className="flex-1 overflow-y-auto px-4 py-3">
@@ -109,6 +112,10 @@ export default function MobileShell() {
 
       <BottomSheet open={membersOpen} onClose={() => setMembersOpen(false)}>
         <MemberManager />
+      </BottomSheet>
+
+      <BottomSheet open={accountOpen} onClose={() => setAccountOpen(false)} title="Konto">
+        <AccountActions onNavigate={() => setAccountOpen(false)} />
       </BottomSheet>
     </div>
   );

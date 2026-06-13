@@ -3,7 +3,6 @@ import { Nunito, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
 import { ErrorProvider } from "@/lib/contexts/ErrorContext";
-import MainLayoutClientWrapper from "@/components/MainLayoutClientWrapper";
 import { ThemeProvider } from "@/lib/contexts/ThemeContext";
 
 // UI font (issue #39). Exposed as a CSS variable consumed by globals.css/Tailwind.
@@ -38,9 +37,7 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthProvider>
             <ErrorProvider>
-              <MainLayoutClientWrapper>
-                {children}
-              </MainLayoutClientWrapper>
+              {children}
             </ErrorProvider>
           </AuthProvider>
         </ThemeProvider>

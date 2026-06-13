@@ -25,13 +25,15 @@ interface MobileHeaderProps {
   onAddSpace: () => void;
   /** Opens the members sheet for the active space (tapping the avatar stack). */
   onManageMembers: () => void;
+  /** Opens the account sheet (Settings / Kontakte / Abmelden). */
+  onAccount: () => void;
 }
 
 /**
  * Fixed mobile header (issue #43): brand + member avatars + theme toggle, with a
  * horizontally scrollable row of space pills underneath. Blurred nav background.
  */
-export default function MobileHeader({ onAddSpace, onManageMembers }: MobileHeaderProps) {
+export default function MobileHeader({ onAddSpace, onManageMembers, onAccount }: MobileHeaderProps) {
   const { spaces, activeSpaceId, activeSpace, openCounts, setActiveSpace } = useSpaces();
   const profiles = useMemberProfiles(activeSpace?.members ?? []);
   const members = activeSpace?.members ?? [];
@@ -65,6 +67,18 @@ export default function MobileHeader({ onAddSpace, onManageMembers }: MobileHead
             </button>
           )}
           <ThemeToggle width={42} height={24} />
+          <button
+            type="button"
+            onClick={onAccount}
+            aria-label="Konto"
+            className="flex shrink-0 items-center justify-center rounded-full border border-border text-text-dim"
+            style={{ width: 32, height: 32 }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
+            </svg>
+          </button>
         </div>
       </div>
 
