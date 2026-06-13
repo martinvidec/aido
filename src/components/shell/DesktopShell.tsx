@@ -14,7 +14,7 @@ export default function DesktopShell() {
   const { activeSpace, loading, view } = useSpaces();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-bg text-text">
+    <div className="hidden h-screen overflow-hidden bg-bg text-text md:flex">
       <Sidebar />
 
       <main className="flex-1 overflow-y-auto">
