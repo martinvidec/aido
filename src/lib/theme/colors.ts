@@ -37,3 +37,16 @@ export function spaceColorFromHue(hue: number): string {
   const known = SPACE_COLORS.find((c) => c.hue === hue);
   return known ? known.value : `oklch(0.72 0.15 ${hue})`;
 }
+
+/**
+ * Deterministic person color: hashes a userId to a stable palette entry so a
+ * given user always gets the same avatar color (handoff: avatars = initials on
+ * a person color).
+ */
+export function personColor(uid: string): string {
+  let hash = 0;
+  for (let i = 0; i < uid.length; i++) {
+    hash = (hash * 31 + uid.charCodeAt(i)) >>> 0;
+  }
+  return getSpaceColor(hash).value;
+}

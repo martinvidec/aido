@@ -21,6 +21,7 @@ import {
   orderBy,
   arrayUnion,
   arrayRemove,
+  getCountFromServer,
   type QueryDocumentSnapshot,
   type DocumentData,
 } from "firebase/firestore";
@@ -182,6 +183,16 @@ export const getTodosForSpace = async (spaceId: string): Promise<Todo[]> => {
   if (!spaceId) return [];
   const snapshot = await getDocs(query(todosCol(spaceId), orderBy("order", "asc")));
   return snapshot.docs.map(mapTodo);
+};
+
+// Server-side count of open (not completed) todos — drives the sidebar/pill
+// "open" badge per space without fetching every todo.
+export const getOpenTodoCount = async (spaceId: string): Promise<number> => {
+  if (!spaceId) return 0;
+  const snapshot = await getCountFromServer(
+    query(todosCol(spaceId), where("completed", "==", false))
+  );
+  return snapshot.data().count;
 };
 
 // Edit title/body together and re-derive tags/mentions from the new content.
