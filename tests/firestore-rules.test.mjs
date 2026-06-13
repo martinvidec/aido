@@ -329,6 +329,26 @@ await check('non-member may not delete a daily item', assertFails(
 await check('member may delete a daily item', assertSucceeds(
   deleteDoc(doc(db(ALICE), DAILY_PATH))));
 
+console.log('Legacy todo migration writes (issue #48):');
+await check('owner may create a space with migration marker fields', assertSucceeds(
+  setDoc(doc(db(ALICE), 'spaces/space-mig'), {
+    name: 'Privat', color: 40, members: [ALICE], createdBy: ALICE, createdAt: 1,
+    migratedDefault: true })));
+await check('owner may create a shared migration space (owner + sharee)', assertSucceeds(
+  setDoc(doc(db(ALICE), 'spaces/space-mig-shared'), {
+    name: 'Geteilt', color: 200, members: [ALICE, BOB], createdBy: ALICE, createdAt: 1,
+    migratedShareKey: `${ALICE},${BOB}` })));
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), `users/${ALICE}/todos/legacy-1`), {
+    text: 'old todo', content: { type: 'doc', content: [] }, completed: false,
+    sharedWith: [BOB], mentionedUsers: [], tags: [] });
+});
+await check('owner may tag a legacy todo with migratedTo', assertSucceeds(
+  updateDoc(doc(db(ALICE), `users/${ALICE}/todos/legacy-1`), {
+    migratedTo: 'spaces/space-mig/todos/new-1' })));
+await check('owner may set the migration flag on their user doc', assertSucceeds(
+  setDoc(doc(db(ALICE), `users/${ALICE}`), { todosMigratedToSpacesAt: 1 }, { merge: true })));
+
 await testEnv.cleanup();
 
 if (failures > 0) {
