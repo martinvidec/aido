@@ -9,17 +9,15 @@ import MemberManager from "./MemberManager";
 import MobileTodos from "./list/MobileTodos";
 import MobileHeute from "./heute/MobileHeute";
 import HeuteInput from "./heute/HeuteInput";
+import MobileBoard from "./board/MobileBoard";
 
-/**
- * Per-tab content (issue #43). Heute → #44, Todos → #45; Board (#46) is still a
- * placeholder.
- */
+/** Per-tab content (issue #43): Heute → #44, Todos → #45, Board → #46. */
 function MobileContent({ tab }: { tab: MobileTab }) {
   if (tab === "heute") {
     return <MobileHeute />;
   }
   if (tab === "board") {
-    return <p className="pt-8 text-center text-sm text-text-dim">Board folgt.</p>;
+    return <MobileBoard />;
   }
   return <MobileTodos />;
 }

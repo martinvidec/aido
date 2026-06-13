@@ -8,23 +8,8 @@ import TodoTitle from "./TodoTitle";
 import TodoBody from "./TodoBody";
 import TodoEditor from "./TodoEditor";
 import TodoActions from "./TodoActions";
+import { checklistProgress } from "@/lib/utils/checklist";
 import type { Todo } from "@/lib/types";
-
-/** Counts task-list checkboxes in a Tiptap body → { done, total }. */
-function checklistProgress(body: unknown): { done: number; total: number } {
-  let done = 0;
-  let total = 0;
-  const walk = (n: any) => {
-    if (!n) return;
-    if (n.type === "taskItem") {
-      total++;
-      if (n.attrs?.checked) done++;
-    }
-    if (Array.isArray(n.content)) n.content.forEach(walk);
-  };
-  walk(body);
-  return { done, total };
-}
 
 interface TodoRowProps {
   todo: Todo;
