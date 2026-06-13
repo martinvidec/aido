@@ -19,7 +19,11 @@ import {
   writeBatch,
   limit,
   orderBy,
+  arrayUnion,
+  arrayRemove,
 } from "firebase/firestore";
+import { getSpaceColor } from "../theme/colors";
+import type { Space } from "../types";
 // Auth functions
 export const logoutUser = () => signOut(auth);
 
@@ -51,6 +55,71 @@ export const updateDocument = (collectionName: string, id: string, data: any) =>
 
 export const deleteDocument = (collectionName: string, id: string) =>
   deleteDoc(doc(db, collectionName, id));
+
+// --- Spaces (issue #40) ---
+// Top-level `spaces/{spaceId}`; membership grants full access. Rights model
+// (see firestore.rules): any member may read/update (rename, recolor, add/remove
+// members — the "+ einladen" flow); createdBy/createdAt are immutable; only the
+// creator may delete the space.
+
+const SPACES_COLLECTION = "spaces";
+
+// Create a space with the creator as the first member. The color is assigned
+// cyclically from the design palette based on how many spaces the user already
+// has, so the Nth space gets the Nth palette hue (wrapping around).
+export const createSpace = async (
+  uid: string,
+  name: string,
+  existingSpaceCount = 0
+): Promise<string> => {
+  if (!uid) throw new Error("User not authenticated.");
+  const ref = await addDoc(collection(db, SPACES_COLLECTION), {
+    name: name.trim(),
+    color: getSpaceColor(existingSpaceCount).hue,
+    members: [uid],
+    createdBy: uid,
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
+};
+
+// Load every space the user is a member of (oldest first, for stable ordering).
+export const getSpacesForUser = async (uid: string): Promise<Space[]> => {
+  if (!uid) return [];
+  const q = query(
+    collection(db, SPACES_COLLECTION),
+    where("members", "array-contains", uid)
+  );
+  const snapshot = await getDocs(q);
+  const spaces = snapshot.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      name: typeof data.name === "string" ? data.name : "",
+      color: typeof data.color === "number" ? data.color : getSpaceColor(0).hue,
+      members: Array.isArray(data.members) ? data.members : [],
+      createdBy: typeof data.createdBy === "string" ? data.createdBy : "",
+      createdAt: data.createdAt ?? null,
+    } as Space;
+  });
+  // array-contains + orderBy would require a composite index, so sort client-side.
+  return spaces.sort(
+    (a, b) => (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0)
+  );
+};
+
+export const renameSpace = (spaceId: string, name: string) =>
+  updateDoc(doc(db, SPACES_COLLECTION, spaceId), { name: name.trim() });
+
+export const addSpaceMember = (spaceId: string, uid: string) =>
+  updateDoc(doc(db, SPACES_COLLECTION, spaceId), { members: arrayUnion(uid) });
+
+export const removeSpaceMember = (spaceId: string, uid: string) =>
+  updateDoc(doc(db, SPACES_COLLECTION, spaceId), { members: arrayRemove(uid) });
+
+// Only the creator may delete (enforced by firestore.rules).
+export const deleteSpace = (spaceId: string) =>
+  deleteDoc(doc(db, SPACES_COLLECTION, spaceId));
 
 // Helper function to generate a SHA-256 hash string from an email
 export const generateIdFromEmail = async (email: string): Promise<string> => {

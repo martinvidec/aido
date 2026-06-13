@@ -174,6 +174,73 @@ await check('sharee may run collection group query', assertSucceeds(
 await check('unauthenticated user may not read', assertFails(
   getDoc(doc(testEnv.unauthenticatedContext().firestore(), TODO_PATH))));
 
+console.log('Spaces (issue #40):');
+const SPACE_PATH = `spaces/space-1`;
+const seedSpace = {
+  name: 'Family', color: 40, members: [ALICE, BOB], createdBy: ALICE, createdAt: 1700000000000,
+};
+async function resetSpace() {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), SPACE_PATH), seedSpace);
+  });
+}
+await resetSpace();
+
+console.log('  reads:');
+await check('member may read a space', assertSucceeds(
+  getDoc(doc(db(ALICE), SPACE_PATH))));
+await check('second member may read a space', assertSucceeds(
+  getDoc(doc(db(BOB), SPACE_PATH))));
+await check('non-member may not read a space', assertFails(
+  getDoc(doc(db(MALLORY), SPACE_PATH))));
+await check('member may query own spaces by membership', assertSucceeds(
+  getDocs(query(collection(db(BOB), 'spaces'),
+    where('members', 'array-contains', BOB)))));
+await check('non-member may not list all spaces', assertFails(
+  getDocs(query(collection(db(MALLORY), 'spaces'),
+    where('members', 'array-contains', ALICE)))));
+
+console.log('  create:');
+await check('user may create a space with self as creator+member', assertSucceeds(
+  setDoc(doc(db(ALICE), 'spaces/space-new'), {
+    name: 'New', color: 200, members: [ALICE], createdBy: ALICE, createdAt: 1 })));
+await check('user may not create a space owned by someone else', assertFails(
+  setDoc(doc(db(MALLORY), 'spaces/space-forge'), {
+    name: 'X', color: 0, members: [MALLORY], createdBy: ALICE, createdAt: 1 })));
+await check('user may not create a space without being a member', assertFails(
+  setDoc(doc(db(MALLORY), 'spaces/space-nomember'), {
+    name: 'X', color: 0, members: [ALICE], createdBy: MALLORY, createdAt: 1 })));
+await check('user may not create a space with non-list members', assertFails(
+  setDoc(doc(db(ALICE), 'spaces/space-badmembers'), {
+    name: 'X', color: 0, members: 'everyone', createdBy: ALICE, createdAt: 1 })));
+
+console.log('  update / invite:');
+await resetSpace();
+await check('member may rename the space', assertSucceeds(
+  updateDoc(doc(db(ALICE), SPACE_PATH), { name: 'Renamed' })));
+// MALLORY is not in members ([ALICE, BOB]) — check this before the invite test
+// below adds them, otherwise it would no longer be testing a non-member.
+await check('non-member may not update the space', assertFails(
+  updateDoc(doc(db(MALLORY), SPACE_PATH), { name: 'hijacked' })));
+await check('member may not change createdBy (takeover)', assertFails(
+  updateDoc(doc(db(BOB), SPACE_PATH), { createdBy: BOB })));
+await check('member may not rewrite createdAt', assertFails(
+  updateDoc(doc(db(ALICE), SPACE_PATH), { createdAt: 1 })));
+await check('member may not set members to a non-list', assertFails(
+  updateDoc(doc(db(ALICE), SPACE_PATH), { members: 'everyone' })));
+// Mutates members, so keep it last in this section.
+await check('member may invite another member', assertSucceeds(
+  updateDoc(doc(db(BOB), SPACE_PATH), { members: [ALICE, BOB, MALLORY] })));
+
+console.log('  delete:');
+await resetSpace();
+await check('non-creator member may not delete the space', assertFails(
+  deleteDoc(doc(db(BOB), SPACE_PATH))));
+await check('non-member may not delete the space', assertFails(
+  deleteDoc(doc(db(MALLORY), SPACE_PATH))));
+await check('creator may delete the space', assertSucceeds(
+  deleteDoc(doc(db(ALICE), SPACE_PATH))));
+
 await testEnv.cleanup();
 
 if (failures > 0) {

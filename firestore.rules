@@ -39,6 +39,40 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Spaces (issue #40): the organizing unit that replaces "My Todos / Shared
+    // with me". Membership grants full access to everything in the space.
+    // Rights model: any member may read and update (rename, recolor, add/remove
+    // members — this is how "+ einladen" works); createdBy/createdAt are
+    // immutable so a member cannot take over or rewrite history; only the
+    // creator may delete the space. Finer-grained roles can be layered on later.
+    match /spaces/{spaceId} {
+      function isExistingMember() {
+        return isAuthenticated() && request.auth.uid in resource.data.members;
+      }
+      // members gates read access, so it must always be a list (never a map/
+      // string that could confuse the `in` membership checks).
+      function isValidSpace() {
+        return request.resource.data.members is list
+            && request.resource.data.name is string
+            && request.resource.data.color is number;
+      }
+
+      allow read: if isExistingMember();
+
+      allow create: if isAuthenticated()
+        && isValidSpace()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.auth.uid in request.resource.data.members;
+
+      allow update: if isExistingMember()
+        && isValidSpace()
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if isAuthenticated()
+        && resource.data.createdBy == request.auth.uid;
+    }
+
     // Rules for specific user documents and their subcollections
     match /users/{userId} {
       // Owner-only: contains PII (email, timezone, notification settings)
