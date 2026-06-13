@@ -13,8 +13,11 @@ export default function MainLayoutClientWrapper({ children }: { children: React.
   const { user, loading } = useAuth();
   const pathname = usePathname();
 
-  // Paths where the Navbar should explicitly NOT be shown, regardless of auth state
-  const noNavPaths = ['/login', '/signin', '/signup']; // Add any other paths as needed
+  // Paths where the Navbar should explicitly NOT be shown, regardless of auth state.
+  // '/todos' is the redesigned workspace (issue #42) — it ships its own shell
+  // chrome (sidebar + space header), so the legacy Navbar is suppressed there.
+  // Full routing unification is issue #49.
+  const noNavPaths = ['/login', '/signin', '/signup', '/todos'];
 
   // Determine if the Navbar should be shown:
   // 1. Auth loading must be finished.
