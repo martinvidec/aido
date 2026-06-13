@@ -2,6 +2,7 @@
 
 import React from "react";
 import { SpacesProvider } from "@/lib/contexts/SpacesContext";
+import { TodosProvider } from "@/lib/contexts/TodosContext";
 import { ToastProvider } from "@/lib/contexts/ToastContext";
 import DesktopShell from "./DesktopShell";
 import MobileShell from "./MobileShell";
@@ -15,8 +16,10 @@ export default function AppShell() {
   return (
     <ToastProvider>
       <SpacesProvider>
-        <DesktopShell />
-        <MobileShell />
+        <TodosProvider>
+          <DesktopShell />
+          <MobileShell />
+        </TodosProvider>
       </SpacesProvider>
     </ToastProvider>
   );

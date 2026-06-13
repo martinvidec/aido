@@ -6,6 +6,7 @@ import MobileHeader from "./MobileHeader";
 import BottomTabs, { type MobileTab } from "./BottomTabs";
 import BottomSheet from "./BottomSheet";
 import MemberManager from "./MemberManager";
+import MobileTodos from "./list/MobileTodos";
 
 /**
  * Per-tab content placeholders (issue #43). Interactive content is built in the
@@ -18,7 +19,7 @@ function MobileContent({ tab }: { tab: MobileTab }) {
   if (tab === "board") {
     return <p className="pt-8 text-center text-sm text-text-dim">Board folgt.</p>;
   }
-  return <p className="pt-8 text-center text-sm text-text-dim">Noch keine Todos.</p>;
+  return <MobileTodos />;
 }
 
 /** "+ Space" creation form, shown inside the bottom sheet (issue #47). */

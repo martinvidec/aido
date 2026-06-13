@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getPublicProfile, type PublicProfile } from "@/lib/firebase/firebaseUtils";
+import { useSpaces } from "@/lib/contexts/SpacesContext";
 
 /**
  * Loads public profiles for a list of member uids (for avatar initials / names).
@@ -38,4 +39,14 @@ export function useMemberProfiles(memberUids: string[]): Record<string, PublicPr
   }, [key]);
 
   return profiles;
+}
+
+/**
+ * Returns a `nameOf(uid)` resolver for the active space's members (issue #45):
+ * member display name, or "jemand" as a fallback.
+ */
+export function useSpaceMemberNames(): (uid: string) => string {
+  const { activeSpace } = useSpaces();
+  const profiles = useMemberProfiles(activeSpace?.members ?? []);
+  return (uid: string) => profiles[uid]?.displayName ?? "jemand";
 }

@@ -228,3 +228,70 @@ body {
 
 /* Task List Styles */
 /* ... task list styles ... */
+
+/* === Redesigned todo body (issue #45) ===
+ * Scoped overrides for the rendered/edited todo body so it follows the design
+ * tokens instead of the legacy gray ProseMirror styles above. Higher specificity
+ * (.todo-body .ProseMirror …) + later source order win over the generic rules. */
+.todo-body .ProseMirror {
+  color: var(--text) !important;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.todo-body .ProseMirror h1,
+.todo-body .ProseMirror h2,
+.todo-body .ProseMirror h3 {
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em;
+  color: var(--text-dim) !important;
+  font-size: 0.78rem !important;
+  font-weight: 800 !important;
+  margin: 0.6em 0 0.3em !important;
+}
+.todo-body .ProseMirror p { margin: 0.25em 0; }
+.todo-body .ProseMirror ul:not([data-type="taskList"]) { list-style: disc; padding-left: 1.2rem; }
+.todo-body .ProseMirror .mention {
+  color: var(--mention) !important;
+  background: var(--mention-bg);
+  border-radius: 4px;
+  padding: 0 2px;
+  font-weight: 600;
+}
+.todo-body .ProseMirror .hashtag {
+  color: var(--tag) !important;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+.todo-body .ProseMirror a { color: var(--accent-text) !important; }
+
+/* Interactive checklist checkboxes (16x16, accent when done). */
+.todo-body .ProseMirror ul[data-type="taskList"] input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  border: 2px solid var(--check-border);
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  margin: 0;
+  flex-shrink: 0;
+}
+.todo-body .ProseMirror ul[data-type="taskList"] input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.todo-body .ProseMirror ul[data-type="taskList"] input[type="checkbox"]:checked::after {
+  content: "✓";
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.todo-body .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
+  opacity: 0.6;
+  text-decoration: line-through;
+}

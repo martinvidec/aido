@@ -58,6 +58,10 @@ interface UseTiptapConfigOptions {
   placeholder?: string;
   enableMentionSuggestion: boolean;
   currentUserId?: string; // Added currentUserId
+  // When set, task-list checkboxes stay interactive even in a non-editable
+  // editor (issue #45: toggling a checklist item in the rendered todo body).
+  // Return true to allow the toggle (TipTap then mutates the doc and fires onUpdate).
+  onReadOnlyChecked?: (node: unknown, checked: boolean) => boolean;
 }
 
 // This hook RETURNS configuration objects, it does NOT call useEditor itself.
@@ -66,6 +70,7 @@ export function useTiptapConfig({
   placeholder,
   enableMentionSuggestion,
   currentUserId, // Destructure currentUserId
+  onReadOnlyChecked,
 }: UseTiptapConfigOptions): {
   extensions: EditorOptions['extensions'];
   editorProps: EditorOptions['editorProps'];
@@ -141,7 +146,10 @@ export function useTiptapConfig({
     ListItem,
     CustomCodeBlock,
     TaskList,
-    TaskItem.configure({ nested: true }),
+    TaskItem.configure({
+      nested: true,
+      ...(onReadOnlyChecked ? { onReadOnlyChecked } : {}),
+    }),
     Underline,
     Link.configure({
       autolink: true,
