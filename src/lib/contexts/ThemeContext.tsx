@@ -6,6 +6,11 @@ import { usePathname } from 'next/navigation';
 // Export the Theme type
 export type Theme = 'light' | 'dark' | 'system';
 
+// Canonical localStorage key for the persisted preference (design handoff, issue #39).
+const STORAGE_KEY = 'aidoF-theme';
+// Legacy key used before the redesign — read once for migration, then superseded.
+const LEGACY_STORAGE_KEY = 'theme';
+
 interface ThemeContextType {
   theme: Theme;
   setTheme: (theme: Theme) => void;
@@ -14,13 +19,16 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-// applyTheme now accepts pathname
+// applyTheme resolves the effective theme and applies it to <html>:
+//  - data-theme="light|dark" drives the redesign oklch tokens (globals.css).
+//  - the legacy .dark class keeps existing Tailwind `dark:` variants working
+//    until every screen is migrated. Both are toggled together so old and new
+//    UI never disagree about the active theme.
 const applyTheme = (theme: Theme, pathname: string): 'light' | 'dark' => {
   let effectiveTheme: 'light' | 'dark';
 
   // Force dark mode for the login page
   if (pathname === '/login') {
-    console.log("Applying forced dark theme for /login");
     effectiveTheme = 'dark';
   } else if (theme === 'system') {
     effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -28,13 +36,26 @@ const applyTheme = (theme: Theme, pathname: string): 'light' | 'dark' => {
     effectiveTheme = theme;
   }
 
-  // Apply the class to the html element
-  if (effectiveTheme === 'dark') {
-    document.documentElement.classList.add('dark');
-  } else {
-    document.documentElement.classList.remove('dark');
-  }
+  const root = document.documentElement;
+  root.setAttribute('data-theme', effectiveTheme);
+  root.classList.toggle('dark', effectiveTheme === 'dark');
+
   return effectiveTheme;
+};
+
+// Read the persisted preference (new key, falling back to the legacy key).
+// Runs only in the browser; defaults to 'system' on the server / first paint.
+const readStoredTheme = (): Theme => {
+  if (typeof window === 'undefined') return 'system';
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (stored === 'light' || stored === 'dark' || stored === 'system') {
+      return stored;
+    }
+  } catch {
+    // Ignore storage access errors (e.g. privacy mode) and fall back to 'system'.
+  }
+  return 'system';
 };
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
@@ -42,12 +63,17 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
   const pathname = usePathname();
 
+  // Hydrate the preference from localStorage once on mount (cannot run on the server).
+  useEffect(() => {
+    setThemeState(readStoredTheme());
+  }, []);
+
   // Effect to apply theme based on state and path initially and on path change
   useEffect(() => {
     const initialResolvedTheme = applyTheme(theme, pathname);
     setResolvedTheme(initialResolvedTheme);
   // Dependencies: theme state AND pathname
-  }, [theme, pathname]); 
+  }, [theme, pathname]);
 
   // Listen for system theme changes only if theme is 'system' AND not on login page
   useEffect(() => {
@@ -63,19 +89,18 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
   // Dependencies: theme state AND pathname
-  }, [theme, pathname]); 
+  }, [theme, pathname]);
 
   const setTheme = useCallback((newTheme: Theme) => {
     try {
       // Store the user's explicit choice, even if /login forces dark visually
-      localStorage.setItem('theme', newTheme);
-      setThemeState(newTheme);
-      // applyTheme is now handled by the state update useEffect
+      localStorage.setItem(STORAGE_KEY, newTheme);
     } catch (error) {
       console.error("Failed to set theme in localStorage", error);
     }
-  // No pathname dependency needed here, as the effect listening to [theme, pathname] handles application
-  }, []); 
+    setThemeState(newTheme);
+    // applyTheme is handled by the [theme, pathname] effect
+  }, []);
 
   const contextValue: ThemeContextType = {
     theme,       // The user's preference (light, dark, system)
@@ -96,4 +121,4 @@ export const useTheme = (): ThemeContextType => {
     throw new Error('useTheme must be used within a ThemeProvider');
   }
   return context;
-}; 
+};

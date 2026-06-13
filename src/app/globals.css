@@ -2,22 +2,66 @@
 @tailwind components;
 @tailwind utilities;
 
+/* === Redesign design tokens (issue #39) ===========================
+ * Source of truth: docs/design_handoff_aido_redesign/README.md → "Design Tokens".
+ * Dark is the default (:root); light is an override on html[data-theme="light"].
+ * ThemeContext toggles BOTH data-theme (new token system) and the legacy
+ * .dark class (existing Tailwind dark: variants) so old and new UI stay in sync
+ * during the migration. Tailwind utilities map onto these vars in tailwind.config.ts.
+ */
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-rgb: 243, 244, 246;
+  --bg: oklch(0.22 0.02 270);
+  --bg-side: oklch(0.19 0.02 270);
+  --bg-card: oklch(0.26 0.02 270);
+  --bg-pop: oklch(0.28 0.02 270);
+  --row-hover: oklch(0.29 0.02 270);
+  --border: oklch(0.33 0.02 270);
+  --text: oklch(0.95 0.01 80);
+  --text-dim: oklch(0.62 0.02 270);
+  --check-border: oklch(0.5 0.03 270);
+  --accent: oklch(0.72 0.15 40);
+  --accent-soft: oklch(0.72 0.15 40 / 0.18);
+  --accent-text: oklch(0.83 0.09 40);
+  --mention: oklch(0.8 0.08 200);
+  --mention-bg: oklch(0.72 0.15 200 / 0.18);
+  --tag: oklch(0.8 0.08 40);
+  --wait-text: oklch(0.82 0.1 75);
+  --wait-bg: oklch(0.75 0.14 75 / 0.16);
+  --danger: oklch(0.68 0.18 25);
+
+  /* Translucent nav background for the mobile header/tab-bar blur (issue #43). */
+  --nav-bg: oklch(0.19 0.02 270 / 0.8);
+  --shadow: 0 8px 28px oklch(0 0 0 / 0.4);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+html[data-theme="light"] {
+  --bg: oklch(0.965 0.008 80);
+  --bg-side: white;
+  --bg-card: white; /* Mobile uses oklch(0.99 0.004 80) — set by the mobile shell (issue #43). */
+  --bg-pop: white;
+  --row-hover: oklch(0.93 0.008 80);
+  --border: oklch(0.89 0.01 80);
+  --text: oklch(0.27 0.02 270);
+  --text-dim: oklch(0.55 0.02 270);
+  --check-border: oklch(0.78 0.02 80);
+  --accent-soft: oklch(0.72 0.15 40 / 0.14);
+  --accent-text: oklch(0.5 0.12 40);
+  --mention: oklch(0.5 0.12 200);
+  --mention-bg: oklch(0.72 0.15 200 / 0.14);
+  --tag: oklch(0.55 0.12 40);
+  --wait-text: oklch(0.5 0.12 75);
+  --danger: oklch(0.55 0.2 25);
+
+  --nav-bg: oklch(1 0 0 / 0.8);
+  --shadow: 0 8px 28px oklch(0 0 0 / 0.14);
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-rgb));
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  /* Theme transition per handoff. */
+  transition: background-color 0.25s, color 0.25s;
 }
 
 @layer utilities {
