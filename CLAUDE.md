@@ -73,6 +73,7 @@ Model Context Protocol endpoint with `streamable-http` (POST) and SSE (GET) tran
 - Firestore rules: `firebase deploy --only firestore:rules`. Deploy **after** the app when rules depend on new app behavior (e.g. a tightened read rule that the old client would break on).
 - Storage rules: `firebase deploy --only storage` (only once Storage is enabled in the Firebase console — it is not currently set up).
 - Cloud Functions: `cd functions && npm run deploy`.
+- **Legacy-todo migration (one-time, issue #66):** the client-lazy migration only runs on the owner's login, so sharees stay stranded until the owner logs in again. Run `npm run migrate:legacy` once against prod (`FIREBASE_SERVICE_ACCOUNT_KEY` set; add `--dry-run` first) to migrate **all** users up front. It mirrors the client's deterministic space ids/markers, so it's idempotent and safe to interleave with client runs. Smoke-test it against the emulator with `npm run test:migration`.
 
 ## Environment
 
