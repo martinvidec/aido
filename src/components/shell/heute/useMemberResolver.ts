@@ -2,6 +2,11 @@
 
 import { useSpaces } from "@/lib/contexts/SpacesContext";
 import { useMemberProfiles } from "@/lib/hooks/useMemberProfiles";
+import {
+  extractMentionTokens,
+  resolveMentionToken,
+  type MentionMember,
+} from "@/lib/utils/textUtils";
 
 export interface MemberResolver {
   members: string[];
@@ -24,18 +29,17 @@ export function useMemberResolver(): MemberResolver {
   const nameOf = (uid: string) => profiles[uid]?.displayName ?? "jemand";
   const firstName = (uid: string) => nameOf(uid).split(/\s+/)[0];
 
+  // Resolve the first @mention in the text to exactly one member uid. Unicode-
+  // aware and exact: an ambiguous or partial token resolves to null rather than
+  // silently picking the first matching member (issue #75).
   const matchMention = (text: string): string | null => {
-    const match = text.match(/@(\w+)/);
-    if (!match) return null;
-    const word = match[1].toLowerCase();
-    return (
-      members.find((uid) =>
-        (profiles[uid]?.displayName ?? "")
-          .toLowerCase()
-          .split(/\s+/)
-          .some((part) => part.startsWith(word))
-      ) ?? null
-    );
+    const tokens = extractMentionTokens(text);
+    if (tokens.length === 0) return null;
+    const list: MentionMember[] = members.map((uid) => ({
+      uid,
+      displayName: profiles[uid]?.displayName ?? null,
+    }));
+    return resolveMentionToken(tokens[0], list);
   };
 
   return { members, nameOf, firstName, matchMention };

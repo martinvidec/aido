@@ -29,7 +29,7 @@ import {
   type DocumentData,
 } from "firebase/firestore";
 import { getSpaceColor } from "../theme/colors";
-import { deriveTags, deriveMentions, extractPlainText } from "../utils/textUtils";
+import { deriveTags, deriveMentions, extractPlainText, type MentionMember } from "../utils/textUtils";
 import type { Space, Todo, Daily, TiptapContent } from "../types";
 // Auth functions
 export const logoutUser = () => signOut(auth);
@@ -172,6 +172,8 @@ export const createTodo = async (
     body?: TiptapContent | null;
     waitingOn?: string | null;
     order?: number;
+    // Space members for resolving plain-text @mentions in the title (issue #76).
+    mentionMembers?: MentionMember[];
   }
 ): Promise<string> => {
   if (!spaceId || !uid) throw new Error("Missing space or user.");
@@ -183,7 +185,7 @@ export const createTodo = async (
     completed: false,
     waitingOn: input.waitingOn ?? null,
     tags: deriveTags(input.title, body),
-    mentions: deriveMentions(body),
+    mentions: deriveMentions(body, input.title, input.mentionMembers),
     createdBy: uid,
     createdAt: serverTimestamp(),
     order: input.order ?? 0,
@@ -221,17 +223,19 @@ export const getOpenTodoCount = async (spaceId: string): Promise<number> => {
 };
 
 // Edit title/body together and re-derive tags/mentions from the new content.
+// `mentionMembers` lets plain-text @mentions in the title resolve too (issue #76).
 export const editTodoContent = (
   spaceId: string,
   todoId: string,
   title: string,
-  body: TiptapContent | null
+  body: TiptapContent | null,
+  mentionMembers?: MentionMember[]
 ) =>
   updateDoc(todoRef(spaceId, todoId), {
     title: title.trim(),
     body,
     tags: deriveTags(title, body),
-    mentions: deriveMentions(body),
+    mentions: deriveMentions(body, title, mentionMembers),
   });
 
 export const setTodoCompleted = (spaceId: string, todoId: string, completed: boolean) =>

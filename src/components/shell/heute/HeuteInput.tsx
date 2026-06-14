@@ -14,7 +14,9 @@ export default function HeuteInput() {
   const resolver = useMemberResolver();
   const [value, setValue] = useState("");
 
-  const tokenMatch = value.match(/@(\w*)$/);
+  // Unicode-aware trailing @token so the popover also opens on non-ASCII
+  // initials (e.g. "@Mü…", "@Jo…") — \w would miss them (issue #75).
+  const tokenMatch = value.match(/@([\p{L}\p{N}_]*)$/u);
   const query = tokenMatch ? tokenMatch[1].toLowerCase() : null;
   const suggestions =
     query !== null
@@ -23,7 +25,7 @@ export default function HeuteInput() {
   const showSuggestions = query !== null && suggestions.length > 0;
 
   const pick = (uid: string) => {
-    setValue(value.replace(/@(\w*)$/, `@${resolver.firstName(uid)} `));
+    setValue(value.replace(/@([\p{L}\p{N}_]*)$/u, `@${resolver.firstName(uid)} `));
   };
 
   const send = async () => {
