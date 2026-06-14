@@ -7,6 +7,7 @@ import { spaceColorFromHue } from "@/lib/theme/colors";
 import Avatar from "./Avatar";
 import SegmentedControl from "./SegmentedControl";
 import InvitePopover from "./InvitePopover";
+import SpaceMenu from "./SpaceMenu";
 
 export default function SpaceHeader() {
   const { activeSpace } = useSpaces();
@@ -38,6 +39,7 @@ export default function SpaceHeader() {
       </div>
 
       <InvitePopover />
+      <SpaceMenu />
 
       <div className="ml-auto">
         <SegmentedControl />

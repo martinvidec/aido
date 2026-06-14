@@ -15,10 +15,25 @@ import {
   subscribeSpacesForUser,
   getOpenTodoCount,
   createSpace as createSpaceDoc,
+  renameSpace as renameSpaceDoc,
+  deleteSpace as deleteSpaceDoc,
   addSpaceMember,
   removeSpaceMember,
 } from "@/lib/firebase/firebaseUtils";
+import { SPACE_COLORS } from "@/lib/theme/colors";
 import type { Space } from "@/lib/types";
+
+// Pick a palette hue for a new space, preferring one not already used by the
+// user's spaces; if all four are taken, pick any at random. Random (rather than
+// count-based) makes it robust to the create race — two spaces created in quick
+// succession before the live list updates are very unlikely to collide, instead
+// of both landing on the same count-derived color (issue #78).
+const pickSpaceColor = (existing: Space[]): number => {
+  const used = new Set(existing.map((s) => s.color));
+  const free = SPACE_COLORS.filter((c) => !used.has(c.hue));
+  const pool = free.length > 0 ? free : SPACE_COLORS;
+  return pool[Math.floor(Math.random() * pool.length)].hue;
+};
 
 export type SpaceView = "liste" | "board";
 
@@ -33,8 +48,12 @@ interface SpacesContextType {
   setActiveSpace: (id: string) => void;
   setView: (view: SpaceView) => void;
   refreshSpaces: () => Promise<void>;
-  /** Create a space (creator = first member, cyclic palette color) and select it. */
+  /** Create a space (creator = first member, free palette color) and select it. */
   createSpace: (name: string) => Promise<string | null>;
+  /** Rename a space (any member). Returns true on success. */
+  renameSpace: (spaceId: string, name: string) => Promise<boolean>;
+  /** Delete a space (creator only; rules-enforced). Returns true on success. */
+  deleteSpace: (spaceId: string) => Promise<boolean>;
   addMember: (spaceId: string, uid: string) => Promise<void>;
   removeMember: (spaceId: string, uid: string) => Promise<void>;
   /** Update one space's open-todo badge locally (e.g. after add/complete). */
@@ -128,7 +147,7 @@ export const SpacesProvider = ({ children }: { children: ReactNode }) => {
     async (name: string): Promise<string | null> => {
       if (!user || !name.trim()) return null;
       try {
-        const id = await createSpaceDoc(user.uid, name, spaces.length);
+        const id = await createSpaceDoc(user.uid, name, pickSpaceColor(spaces));
         // The new space arrives via the live subscription; select it now.
         setActiveSpaceId(id);
         return id;
@@ -138,7 +157,38 @@ export const SpacesProvider = ({ children }: { children: ReactNode }) => {
         return null;
       }
     },
-    [user, spaces.length, showError]
+    [user, spaces, showError]
+  );
+
+  const renameSpace = useCallback(
+    async (spaceId: string, name: string): Promise<boolean> => {
+      if (!name.trim()) return false;
+      try {
+        await renameSpaceDoc(spaceId, name);
+        return true;
+      } catch (e) {
+        console.error("renameSpace failed", e);
+        showError("Space konnte nicht umbenannt werden.");
+        return false;
+      }
+    },
+    [showError]
+  );
+
+  const deleteSpace = useCallback(
+    async (spaceId: string): Promise<boolean> => {
+      try {
+        await deleteSpaceDoc(spaceId);
+        // The space disappears via the live subscription, which re-selects a
+        // remaining space (or null) in applyLoaded.
+        return true;
+      } catch (e) {
+        console.error("deleteSpace failed", e);
+        showError("Space konnte nicht gelöscht werden.");
+        return false;
+      }
+    },
+    [showError]
   );
 
   const addMember = useCallback(
@@ -182,6 +232,8 @@ export const SpacesProvider = ({ children }: { children: ReactNode }) => {
     setView,
     refreshSpaces,
     createSpace,
+    renameSpace,
+    deleteSpace,
     addMember,
     removeMember,
     setOpenCount,
