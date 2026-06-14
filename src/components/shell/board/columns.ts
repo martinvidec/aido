@@ -19,7 +19,7 @@ interface BuildArgs {
   currentUid: string | undefined;
   nameOf: (uid: string) => string;
   setWaitingOn: (id: string, waitingOn: string | null) => Promise<void>;
-  setCompleted: (id: string, completed: boolean) => Promise<void>;
+  setStatus: (id: string, status: { completed: boolean; waitingOn: string | null }) => Promise<void>;
 }
 
 /**
@@ -37,7 +37,7 @@ export function buildColumns({
   currentUid,
   nameOf,
   setWaitingOn,
-  setCompleted,
+  setStatus,
 }: BuildArgs): BoardColumn[] {
   if (groupBy === "person") {
     const open = todos.filter((t) => !t.completed);
@@ -65,16 +65,16 @@ export function buildColumns({
     return columns;
   }
 
-  // Status grouping
+  // Status grouping. Each drop is a single atomic write of completed + waitingOn
+  // (issue #79): "Offen" clears both flags, "Erledigt" also clears waitingOn so a
+  // done card stops showing "bei X" and doesn't reappear in a person column when
+  // reopened. One updateDoc → no visible half-applied state, no double load.
   return [
     {
       id: "offen",
       label: "Offen",
       todos: todos.filter((t) => !t.completed && !t.waitingOn),
-      apply: async (id) => {
-        await setWaitingOn(id, null);
-        await setCompleted(id, false);
-      },
+      apply: (id) => setStatus(id, { completed: false, waitingOn: null }),
     },
     {
       id: "wartet",
@@ -86,7 +86,7 @@ export function buildColumns({
       id: "erledigt",
       label: "Erledigt",
       todos: todos.filter((t) => t.completed),
-      apply: (id) => setCompleted(id, true),
+      apply: (id) => setStatus(id, { completed: true, waitingOn: null }),
     },
   ];
 }

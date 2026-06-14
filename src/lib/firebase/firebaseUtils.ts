@@ -243,6 +243,17 @@ export const setTodoWaitingOn = (
   waitingOn: string | null
 ) => updateDoc(todoRef(spaceId, todoId), { waitingOn });
 
+// Atomic status transition for the board status drops (issue #79): writes
+// `completed` and `waitingOn` together in one updateDoc, so a card never flashes
+// a half-applied intermediate state and completing one can't leave a stale
+// `waitingOn` behind (which would keep showing "bei X" and re-surface it in the
+// person column when reopened).
+export const setTodoStatus = (
+  spaceId: string,
+  todoId: string,
+  status: { completed: boolean; waitingOn: string | null }
+) => updateDoc(todoRef(spaceId, todoId), status);
+
 export const setTodoOrder = (spaceId: string, todoId: string, order: number) =>
   updateDoc(todoRef(spaceId, todoId), { order });
 

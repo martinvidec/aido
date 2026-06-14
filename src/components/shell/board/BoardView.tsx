@@ -13,7 +13,7 @@ import { buildColumns, type BoardColumn, type GroupBy } from "./columns";
 
 /** Desktop Board view (issue #46): horizontal columns with HTML5 drag & drop. */
 export default function BoardView() {
-  const { todos, loading, setWaitingOn, setCompleted } = useTodos();
+  const { todos, loading, setWaitingOn, setStatus } = useTodos();
   const { activeSpace } = useSpaces();
   const { user } = useAuth();
   const nameOf = useSpaceMemberNames();
@@ -32,9 +32,9 @@ export default function BoardView() {
         currentUid: user?.uid,
         nameOf,
         setWaitingOn,
-        setCompleted,
+        setStatus,
       }),
-    [groupBy, todos, activeSpace, user, nameOf, setWaitingOn, setCompleted]
+    [groupBy, todos, activeSpace, user, nameOf, setWaitingOn, setStatus]
   );
 
   const onDrop = async (col: BoardColumn) => {
