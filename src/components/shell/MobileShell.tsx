@@ -6,6 +6,7 @@ import MobileHeader from "./MobileHeader";
 import BottomTabs, { type MobileTab } from "./BottomTabs";
 import BottomSheet from "./BottomSheet";
 import MemberManager from "./MemberManager";
+import SpaceManager from "./SpaceManager";
 import AccountActions from "./AccountActions";
 import MobileTodos from "./list/MobileTodos";
 import MobileHeute from "./heute/MobileHeute";
@@ -116,8 +117,12 @@ export default function MobileShell() {
         <NewSpaceForm onDone={() => setAddSpaceOpen(false)} />
       </BottomSheet>
 
-      <BottomSheet open={membersOpen} onClose={() => setMembersOpen(false)}>
-        <MemberManager />
+      <BottomSheet open={membersOpen} onClose={() => setMembersOpen(false)} title="Space">
+        <div className="flex flex-col gap-4 pb-2">
+          <SpaceManager onDone={() => setMembersOpen(false)} />
+          <div className="border-t border-border" />
+          <MemberManager />
+        </div>
       </BottomSheet>
 
       <BottomSheet open={accountOpen} onClose={() => setAccountOpen(false)} title="Konto">

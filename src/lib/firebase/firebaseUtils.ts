@@ -53,18 +53,19 @@ export const signInWithGoogle = async () => {
 
 const SPACES_COLLECTION = "spaces";
 
-// Create a space with the creator as the first member. The color is assigned
-// cyclically from the design palette based on how many spaces the user already
-// has, so the Nth space gets the Nth palette hue (wrapping around).
+// Create a space with the creator as the first member. The caller picks the
+// palette hue (see SpacesContext.createSpace) — passing an explicit color avoids
+// the race where deriving it from a stale space count gave two quickly-created
+// spaces the same color (issue #78). Falls back to the first palette hue.
 export const createSpace = async (
   uid: string,
   name: string,
-  existingSpaceCount = 0
+  colorHue: number = getSpaceColor(0).hue
 ): Promise<string> => {
   if (!uid) throw new Error("User not authenticated.");
   const ref = await addDoc(collection(db, SPACES_COLLECTION), {
     name: name.trim(),
-    color: getSpaceColor(existingSpaceCount).hue,
+    color: colorHue,
     members: [uid],
     createdBy: uid,
     createdAt: serverTimestamp(),
