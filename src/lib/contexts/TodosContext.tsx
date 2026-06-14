@@ -11,6 +11,7 @@ import React, {
 } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useSpaces } from "@/lib/contexts/SpacesContext";
+import { useToast } from "@/lib/contexts/ToastContext";
 import {
   getTodosForSpace,
   createTodo as createTodoDoc,
@@ -37,8 +38,10 @@ interface TodosContextType {
   /** Todos matching the active tag filter (AND), still split open/done by callers. */
   filtered: Todo[];
   refresh: () => Promise<void>;
-  createTodo: (input: CreateTodoInput) => Promise<void>;
-  editContent: (id: string, title: string, body: TiptapContent | null) => Promise<void>;
+  /** Returns true on success; on failure shows an error toast and returns false. */
+  createTodo: (input: CreateTodoInput) => Promise<boolean>;
+  /** Returns true on success; on failure shows an error toast and returns false. */
+  editContent: (id: string, title: string, body: TiptapContent | null) => Promise<boolean>;
   setCompleted: (id: string, completed: boolean) => Promise<void>;
   setWaitingOn: (id: string, waitingOn: string | null) => Promise<void>;
   remove: (id: string) => Promise<void>;
@@ -53,6 +56,7 @@ const TodosContext = createContext<TodosContextType | undefined>(undefined);
 export const TodosProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const { activeSpaceId, setOpenCount } = useSpaces();
+  const { showError } = useToast();
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
   const [tagFilters, setTagFilters] = useState<string[]>([]);
@@ -97,53 +101,82 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
   }, [todos, tagFilters]);
 
   const createTodo = useCallback(
-    async (input: CreateTodoInput) => {
-      if (!activeSpaceId || !user) return;
-      const maxOrder = todos.reduce((m, t) => Math.max(m, t.order), 0);
-      await createTodoDoc(activeSpaceId, user.uid, {
-        title: input.title,
-        body: input.body ?? null,
-        order: maxOrder + 1,
-      });
-      await refresh();
+    async (input: CreateTodoInput): Promise<boolean> => {
+      if (!activeSpaceId || !user) return false;
+      try {
+        const maxOrder = todos.reduce((m, t) => Math.max(m, t.order), 0);
+        await createTodoDoc(activeSpaceId, user.uid, {
+          title: input.title,
+          body: input.body ?? null,
+          order: maxOrder + 1,
+        });
+        await refresh();
+        return true;
+      } catch (e) {
+        console.error("createTodo failed", e);
+        showError("Todo konnte nicht erstellt werden.");
+        return false;
+      }
     },
-    [activeSpaceId, user, todos, refresh]
+    [activeSpaceId, user, todos, refresh, showError]
   );
 
   const editContent = useCallback(
-    async (id: string, title: string, body: TiptapContent | null) => {
-      if (!activeSpaceId) return;
-      await editTodoContent(activeSpaceId, id, title, body);
-      await refresh();
+    async (id: string, title: string, body: TiptapContent | null): Promise<boolean> => {
+      if (!activeSpaceId) return false;
+      try {
+        await editTodoContent(activeSpaceId, id, title, body);
+        await refresh();
+        return true;
+      } catch (e) {
+        console.error("editContent failed", e);
+        showError("Änderung konnte nicht gespeichert werden.");
+        return false;
+      }
     },
-    [activeSpaceId, refresh]
+    [activeSpaceId, refresh, showError]
   );
 
   const setCompleted = useCallback(
     async (id: string, completed: boolean) => {
       if (!activeSpaceId) return;
-      await setTodoCompleted(activeSpaceId, id, completed);
-      await refresh();
+      try {
+        await setTodoCompleted(activeSpaceId, id, completed);
+        await refresh();
+      } catch (e) {
+        console.error("setCompleted failed", e);
+        showError("Status konnte nicht geändert werden.");
+      }
     },
-    [activeSpaceId, refresh]
+    [activeSpaceId, refresh, showError]
   );
 
   const setWaitingOn = useCallback(
     async (id: string, waitingOn: string | null) => {
       if (!activeSpaceId) return;
-      await setTodoWaitingOn(activeSpaceId, id, waitingOn);
-      await refresh();
+      try {
+        await setTodoWaitingOn(activeSpaceId, id, waitingOn);
+        await refresh();
+      } catch (e) {
+        console.error("setWaitingOn failed", e);
+        showError("Zuweisung konnte nicht gespeichert werden.");
+      }
     },
-    [activeSpaceId, refresh]
+    [activeSpaceId, refresh, showError]
   );
 
   const remove = useCallback(
     async (id: string) => {
       if (!activeSpaceId) return;
-      await deleteTodo(activeSpaceId, id);
-      await refresh();
+      try {
+        await deleteTodo(activeSpaceId, id);
+        await refresh();
+      } catch (e) {
+        console.error("remove failed", e);
+        showError("Todo konnte nicht gelöscht werden.");
+      }
     },
-    [activeSpaceId, refresh]
+    [activeSpaceId, refresh, showError]
   );
 
   const value: TodosContextType = {

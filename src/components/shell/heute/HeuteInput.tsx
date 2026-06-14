@@ -26,11 +26,11 @@ export default function HeuteInput() {
     setValue(value.replace(/@(\w*)$/, `@${resolver.firstName(uid)} `));
   };
 
-  const send = () => {
+  const send = async () => {
     const text = value.trim();
     if (!text) return;
-    setValue("");
-    add(text);
+    // Clear only after a successful write so the text isn't lost on failure (#68).
+    if (await add(text)) setValue("");
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {

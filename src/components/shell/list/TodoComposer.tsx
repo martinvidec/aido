@@ -20,8 +20,8 @@ export default function TodoComposer() {
   const quickAdd = async () => {
     const value = quick.trim();
     if (!value) return;
-    setQuick("");
-    await createTodo({ title: value });
+    // Clear only after a successful write so the text isn't lost on failure (#68).
+    if (await createTodo({ title: value })) setQuick("");
   };
 
   if (open) {
@@ -31,8 +31,8 @@ export default function TodoComposer() {
         submitLabel="Hinzufügen"
         onCancel={() => setOpen(false)}
         onSave={async (title, body) => {
-          await createTodo({ title, body });
-          setOpen(false);
+          // Keep the editor open (draft intact) if the write fails (#68).
+          if (await createTodo({ title, body })) setOpen(false);
         }}
       />
     );

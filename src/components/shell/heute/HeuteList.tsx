@@ -92,7 +92,10 @@ export default function HeuteList() {
   const resolver = useMemberResolver();
 
   const promote = async (d: Daily) => {
-    await createTodo({ title: d.text });
+    // Only remove the daily once the todo actually exists — otherwise a failed
+    // createTodo would still delete the daily and lose it (#68). createTodo
+    // shows its own error toast on failure.
+    if (!(await createTodo({ title: d.text }))) return;
     await remove(d.id);
     showToast("In die Liste übernommen.");
   };

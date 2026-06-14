@@ -50,8 +50,8 @@ export default function TodoRow({ todo, nameOf, variant = "desktop", onOpenActio
         initialBody={todo.body}
         onCancel={() => setEditing(false)}
         onSave={async (title, body) => {
-          await editContent(todo.id, title, body);
-          setEditing(false);
+          // Keep the editor open (edit intact) if the save fails (#68).
+          if (await editContent(todo.id, title, body)) setEditing(false);
         }}
       />
     );
