@@ -9,7 +9,10 @@ import { useTodos } from "@/lib/contexts/TodosContext";
  */
 export default function TagFilterBar() {
   const { tags, tagFilters, toggleTag, clearTags } = useTodos();
-  if (tags.length === 0) return null;
+  // Render while there are tags to pick OR a filter is still active, so the
+  // "✕ Filter" reset stays reachable even if the last filtered tag just vanished
+  // (issue #74) — otherwise the list could be stuck empty with no affordance.
+  if (tags.length === 0 && tagFilters.length === 0) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-2">

@@ -109,6 +109,19 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
     return [...set].sort();
   }, [todos]);
 
+  // Drop filters for tags that no longer exist on any todo (issue #74): deleting
+  // or renaming the last todo carrying a filtered tag removes it from `tags`, so
+  // a stale filter would otherwise keep the list empty with no way to recover
+  // (TagFilterBar renders no chips when there are no tags). Pruning the state
+  // keeps the chips honest and stops a vanished tag from silently re-activating
+  // if it later reappears.
+  useEffect(() => {
+    setTagFilters((prev) => {
+      const next = prev.filter((tag) => tags.includes(tag));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [tags]);
+
   const toggleTag = useCallback((tag: string) => {
     setTagFilters((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
@@ -118,10 +131,13 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
   const clearTags = useCallback(() => setTagFilters([]), []);
 
   const filtered = useMemo(() => {
-    if (tagFilters.length === 0) return todos;
+    // Only filter by tags that still exist, so the list never strands empty in
+    // the brief window before the prune effect above runs (issue #74).
+    const active = tagFilters.filter((tag) => tags.includes(tag));
+    if (active.length === 0) return todos;
     // AND filter: a todo must carry every active tag.
-    return todos.filter((t) => tagFilters.every((tag) => t.tags.includes(tag)));
-  }, [todos, tagFilters]);
+    return todos.filter((t) => active.every((tag) => t.tags.includes(tag)));
+  }, [todos, tagFilters, tags]);
 
   const createTodo = useCallback(
     async (input: CreateTodoInput): Promise<boolean> => {
