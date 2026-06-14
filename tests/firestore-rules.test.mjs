@@ -165,10 +165,18 @@ await check('owner may read own todo directly', assertSucceeds(
   getDoc(doc(db(ALICE), TODO_PATH))));
 await check('mentioned user may read the todo directly', assertSucceeds(
   getDoc(doc(db(VICTIM), `users/${ALICE}/todos/todo-mention`))));
-await check('mentioned user may run collection group query', assertSucceeds(
+await check('sharee may read the shared todo directly', assertSucceeds(
+  getDoc(doc(db(BOB), TODO_PATH))));
+await check('owner may run a scoped query over own legacy todos', assertSucceeds(
+  getDocs(collection(db(ALICE), `users/${ALICE}/todos`))));
+// Issue #80: the legacy read rule is scoped to path[0] == 'users', which a
+// cross-collection collectionGroup('todos') query cannot guarantee — so such
+// queries are now denied. This is the deliberate retirement of "shared with me"
+// enumeration; sharees reach migrated todos through their space instead.
+await check('mentioned user may NOT run a collection group query (retired)', assertFails(
   getDocs(query(collectionGroup(db(VICTIM), 'todos'),
     where('mentionedUsers', 'array-contains', VICTIM)))));
-await check('sharee may run collection group query', assertSucceeds(
+await check('sharee may NOT run a collection group query (retired)', assertFails(
   getDocs(query(collectionGroup(db(BOB), 'todos'),
     where('sharedWith', 'array-contains', BOB)))));
 await check('unauthenticated user may not read', assertFails(
@@ -277,6 +285,18 @@ await check('member may list space todos', assertSucceeds(
   getDocs(collection(db(BOB), `spaces/${TS}/todos`))));
 await check('non-member may not list space todos', assertFails(
   getDocs(collection(db(MALLORY), `spaces/${TS}/todos`))));
+// The legacy collection-group read rule is scoped to path[0] == 'users' (issue
+// #80). A space todo that (hypothetically) carried legacy sharedWith/
+// mentionedUsers fields must NOT become readable by a non-member via that
+// wildcard rule — only space membership grants read here.
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), `spaces/${TS}/todos/leak`), {
+    spaceId: TS, title: 'secret', body: null, completed: false, waitingOn: null,
+    tags: [], mentions: [], createdBy: ALICE, createdAt: 1, order: 9,
+    sharedWith: [MALLORY], mentionedUsers: [MALLORY] });
+});
+await check('non-member may not read a space todo via legacy sharedWith', assertFails(
+  getDoc(doc(db(MALLORY), `spaces/${TS}/todos/leak`))));
 
 console.log('  todo writes (full collaboration):');
 await check('member (non-creator) may create a todo', assertSucceeds(
