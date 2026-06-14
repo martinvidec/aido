@@ -43,8 +43,10 @@ service cloud.firestore {
     // with me". Membership grants full access to everything in the space.
     // Rights model: any member may read and update (rename, recolor, add/remove
     // members — this is how "+ einladen" works); createdBy/createdAt are
-    // immutable so a member cannot take over or rewrite history; only the
-    // creator may delete the space. Finer-grained roles can be layered on later.
+    // immutable so a member cannot take over or rewrite history; the creator
+    // must stay in members so the space can never be orphaned (only the creator
+    // may delete it); only the creator may delete the space. Finer-grained roles
+    // can be layered on later.
     match /spaces/{spaceId} {
       function isExistingMember() {
         return isAuthenticated() && request.auth.uid in resource.data.members;
@@ -79,7 +81,11 @@ service cloud.firestore {
       allow update: if isExistingMember()
         && isValidSpace()
         && request.resource.data.createdBy == resource.data.createdBy
-        && request.resource.data.createdAt == resource.data.createdAt;
+        && request.resource.data.createdAt == resource.data.createdAt
+        // The creator can never be removed from members — otherwise they lose
+        // read access and, since only the creator may delete, the space (with
+        // all its todos/dailies) becomes orphaned and undeletable (issue #64).
+        && request.resource.data.createdBy in request.resource.data.members;
 
       allow delete: if isAuthenticated()
         && resource.data.createdBy == request.auth.uid;
