@@ -27,7 +27,7 @@ import {
   type DocumentData,
 } from "firebase/firestore";
 import { getSpaceColor } from "../theme/colors";
-import { deriveTags, deriveMentions } from "../utils/textUtils";
+import { deriveTags, deriveMentions, extractPlainText } from "../utils/textUtils";
 import type { Space, Todo, Daily, TiptapContent } from "../types";
 // Auth functions
 export const logoutUser = () => signOut(auth);
@@ -767,6 +767,19 @@ const firstLine = (text: string): string =>
     .map((s) => s.trim())
     .find(Boolean) ?? "";
 
+// First non-empty block's text of a Tiptap body — used as a title fallback for
+// legacy todos created purely via the editor (empty `text`), so they don't all
+// collapse to "(ohne Titel)" (issue #69).
+const firstBodyLine = (body: TiptapContent | null): string => {
+  const blocks = (body as { content?: unknown[] } | null)?.content;
+  if (!Array.isArray(blocks)) return "";
+  for (const block of blocks) {
+    const text = extractPlainText(block).trim();
+    if (text) return text;
+  }
+  return "";
+};
+
 const memberSetKey = (members: string[]): string =>
   [...new Set(members)].sort().join(",");
 
@@ -865,7 +878,7 @@ export const migrateLegacyTodos = async (uid: string): Promise<void> => {
       const plain = typeof data.text === "string" ? data.text : "";
       const body =
         data.content && typeof data.content === "object" ? (data.content as TiptapContent) : null;
-      const title = firstLine(plain) || "(ohne Titel)";
+      const title = firstLine(plain) || firstBodyLine(body) || "(ohne Titel)";
       const tags =
         Array.isArray(data.tags) && data.tags.length ? data.tags : deriveTags(title, body);
       const mentions = Array.isArray(data.mentionedUsers)

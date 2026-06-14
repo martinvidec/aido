@@ -51,13 +51,22 @@ async function seed() {
     mentionedUsers: [],
     tags: [],
   });
+  // Rich-text-only todo: empty `text`, title must come from the body (#69).
+  await db.collection("users").doc(ALICE).collection("todos").doc("t-richtext").set({
+    text: "",
+    content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Aus dem Editor" }] }] },
+    completed: false,
+    sharedWith: [],
+    mentionedUsers: [],
+    tags: [],
+  });
 }
 
 console.log("Admin migration (issue #66):");
 await seed();
 
 const first = await migrateAllUsers(db, {});
-check("reports 2 migrated todos", first.migratedTodos === 2);
+check("reports 3 migrated todos", first.migratedTodos === 3);
 check("reports 2 spaces created (Privat + Geteilt)", first.spacesCreated === 2);
 
 const privatId = migrationSpaceId(ALICE, null);
@@ -75,9 +84,11 @@ check(
 );
 
 const privTodos = await db.collection("spaces").doc(privatId).collection("todos").get();
-check("Privat space has 1 todo", privTodos.size === 1);
-check("private todo title derived from first line", privTodos.docs[0].data().title === "Privat A");
-check("private todo keeps legacy tag", JSON.stringify(privTodos.docs[0].data().tags) === JSON.stringify(["home"]));
+const privByTitle = Object.fromEntries(privTodos.docs.map((d) => [d.data().title, d.data()]));
+check("Privat space has 2 todos", privTodos.size === 2);
+check("private todo title derived from first line", !!privByTitle["Privat A"]);
+check("private todo keeps legacy tag", JSON.stringify(privByTitle["Privat A"]?.tags) === JSON.stringify(["home"]));
+check("rich-text-only todo gets title from body (#69)", !!privByTitle["Aus dem Editor"]);
 
 const sharedTodos = await db.collection("spaces").doc(sharedId).collection("todos").get();
 check("Geteilt space has 1 todo", sharedTodos.size === 1);
@@ -97,7 +108,7 @@ check("second run migrates nothing (flag set)", second.migratedTodos === 0 && se
 const forced = await migrateAllUsers(db, { force: true });
 check("forced re-run creates no duplicate todos", forced.migratedTodos === 0);
 const privTodos2 = await db.collection("spaces").doc(privatId).collection("todos").get();
-check("Privat space still has exactly 1 todo after re-runs", privTodos2.size === 1);
+check("Privat space still has exactly 2 todos after re-runs", privTodos2.size === 2);
 
 if (failures) {
   console.error(`\n${failures} migration test(s) failed`);
