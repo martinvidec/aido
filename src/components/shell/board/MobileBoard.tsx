@@ -18,7 +18,7 @@ import type { Todo } from "@/lib/types";
  * each card has a "Verschieben" sheet listing the other columns as targets.
  */
 export default function MobileBoard() {
-  const { todos, loading, setWaitingOn, setCompleted } = useTodos();
+  const { todos, loading, setWaitingOn, setStatus } = useTodos();
   const { activeSpace } = useSpaces();
   const { user } = useAuth();
   const nameOf = useSpaceMemberNames();
@@ -36,9 +36,9 @@ export default function MobileBoard() {
         currentUid: user?.uid,
         nameOf,
         setWaitingOn,
-        setCompleted,
+        setStatus,
       }),
-    [groupBy, todos, activeSpace, user, nameOf, setWaitingOn, setCompleted]
+    [groupBy, todos, activeSpace, user, nameOf, setWaitingOn, setStatus]
   );
 
   const targets = columns.filter((c) => c.apply);

@@ -19,6 +19,7 @@ import {
   editTodoContent,
   setTodoCompleted,
   setTodoWaitingOn,
+  setTodoStatus,
   deleteTodo,
 } from "@/lib/firebase/firebaseUtils";
 import type { Todo, TiptapContent } from "@/lib/types";
@@ -45,6 +46,8 @@ interface TodosContextType {
   editContent: (id: string, title: string, body: TiptapContent | null) => Promise<boolean>;
   setCompleted: (id: string, completed: boolean) => Promise<void>;
   setWaitingOn: (id: string, waitingOn: string | null) => Promise<void>;
+  /** Atomic status transition (completed + waitingOn in one write); board drops. */
+  setStatus: (id: string, status: { completed: boolean; waitingOn: string | null }) => Promise<void>;
   remove: (id: string) => Promise<void>;
 }
 
@@ -184,6 +187,19 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
     [activeSpaceId, showError]
   );
 
+  const setStatus = useCallback(
+    async (id: string, status: { completed: boolean; waitingOn: string | null }) => {
+      if (!activeSpaceId) return;
+      try {
+        await setTodoStatus(activeSpaceId, id, status);
+      } catch (e) {
+        console.error("setStatus failed", e);
+        showError("Status konnte nicht geändert werden.");
+      }
+    },
+    [activeSpaceId, showError]
+  );
+
   const remove = useCallback(
     async (id: string) => {
       if (!activeSpaceId) return;
@@ -210,6 +226,7 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
     editContent,
     setCompleted,
     setWaitingOn,
+    setStatus,
     remove,
   };
 
