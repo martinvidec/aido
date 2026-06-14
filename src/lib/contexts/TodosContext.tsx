@@ -12,6 +12,7 @@ import React, {
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useSpaces } from "@/lib/contexts/SpacesContext";
 import { useToast } from "@/lib/contexts/ToastContext";
+import { useMemberProfiles } from "@/lib/hooks/useMemberProfiles";
 import {
   getTodosForSpace,
   subscribeTodosForSpace,
@@ -21,6 +22,7 @@ import {
   setTodoWaitingOn,
   deleteTodo,
 } from "@/lib/firebase/firebaseUtils";
+import type { MentionMember } from "@/lib/utils/textUtils";
 import type { Todo, TiptapContent } from "@/lib/types";
 
 interface CreateTodoInput {
@@ -56,11 +58,24 @@ const TodosContext = createContext<TodosContextType | undefined>(undefined);
  */
 export const TodosProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
-  const { activeSpaceId, setOpenCount } = useSpaces();
+  const { activeSpaceId, activeSpace, setOpenCount } = useSpaces();
   const { showError } = useToast();
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
   const [tagFilters, setTagFilters] = useState<string[]>([]);
+
+  // Member profiles of the active space, used to resolve plain-text @mentions in
+  // a todo title against members (issue #76) — symmetric with #tags, which are
+  // already derived from the title.
+  const memberProfiles = useMemberProfiles(activeSpace?.members ?? []);
+  const mentionMembers = useMemo<MentionMember[]>(
+    () =>
+      (activeSpace?.members ?? []).map((uid) => ({
+        uid,
+        displayName: memberProfiles[uid]?.displayName ?? null,
+      })),
+    [activeSpace, memberProfiles]
+  );
 
   // Manual one-shot reload, kept as a fallback. Live updates flow through the
   // onSnapshot subscription below (issue #72), so mutations no longer call this.
@@ -132,6 +147,7 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
           title: input.title,
           body: input.body ?? null,
           order: maxOrder + 1,
+          mentionMembers,
         });
         return true;
       } catch (e) {
@@ -140,14 +156,14 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
     },
-    [activeSpaceId, user, todos, showError]
+    [activeSpaceId, user, todos, mentionMembers, showError]
   );
 
   const editContent = useCallback(
     async (id: string, title: string, body: TiptapContent | null): Promise<boolean> => {
       if (!activeSpaceId) return false;
       try {
-        await editTodoContent(activeSpaceId, id, title, body);
+        await editTodoContent(activeSpaceId, id, title, body, mentionMembers);
         return true;
       } catch (e) {
         console.error("editContent failed", e);
@@ -155,7 +171,7 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
     },
-    [activeSpaceId, showError]
+    [activeSpaceId, mentionMembers, showError]
   );
 
   const setCompleted = useCallback(
