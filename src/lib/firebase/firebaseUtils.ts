@@ -23,6 +23,8 @@ import {
   arrayUnion,
   arrayRemove,
   getCountFromServer,
+  onSnapshot,
+  type Unsubscribe,
   type QueryDocumentSnapshot,
   type DocumentData,
 } from "firebase/firestore";
@@ -70,30 +72,44 @@ export const createSpace = async (
   return ref.id;
 };
 
+const mapSpace = (d: QueryDocumentSnapshot<DocumentData>): Space => {
+  const data = d.data();
+  return {
+    id: d.id,
+    name: typeof data.name === "string" ? data.name : "",
+    color: typeof data.color === "number" ? data.color : getSpaceColor(0).hue,
+    members: Array.isArray(data.members) ? data.members : [],
+    createdBy: typeof data.createdBy === "string" ? data.createdBy : "",
+    createdAt: data.createdAt ?? null,
+  } as Space;
+};
+
+// array-contains + orderBy would require a composite index, so sort client-side.
+const sortSpaces = (spaces: Space[]): Space[] =>
+  spaces.sort((a, b) => (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0));
+
+const spacesForUserQuery = (uid: string) =>
+  query(collection(db, SPACES_COLLECTION), where("members", "array-contains", uid));
+
 // Load every space the user is a member of (oldest first, for stable ordering).
 export const getSpacesForUser = async (uid: string): Promise<Space[]> => {
   if (!uid) return [];
-  const q = query(
-    collection(db, SPACES_COLLECTION),
-    where("members", "array-contains", uid)
-  );
-  const snapshot = await getDocs(q);
-  const spaces = snapshot.docs.map((d) => {
-    const data = d.data();
-    return {
-      id: d.id,
-      name: typeof data.name === "string" ? data.name : "",
-      color: typeof data.color === "number" ? data.color : getSpaceColor(0).hue,
-      members: Array.isArray(data.members) ? data.members : [],
-      createdBy: typeof data.createdBy === "string" ? data.createdBy : "",
-      createdAt: data.createdAt ?? null,
-    } as Space;
-  });
-  // array-contains + orderBy would require a composite index, so sort client-side.
-  return spaces.sort(
-    (a, b) => (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0)
-  );
+  const snapshot = await getDocs(spacesForUserQuery(uid));
+  return sortSpaces(snapshot.docs.map(mapSpace));
 };
+
+// Live subscription to the user's spaces (issue #72): returns an unsubscribe
+// function. Fires immediately with the current set, then on every change.
+export const subscribeSpacesForUser = (
+  uid: string,
+  onChange: (spaces: Space[]) => void,
+  onError?: (error: Error) => void
+): Unsubscribe =>
+  onSnapshot(
+    spacesForUserQuery(uid),
+    (snap) => onChange(sortSpaces(snap.docs.map(mapSpace))),
+    onError
+  );
 
 export const renameSpace = (spaceId: string, name: string) =>
   updateDoc(doc(db, SPACES_COLLECTION, spaceId), { name: name.trim() });
@@ -180,6 +196,19 @@ export const getTodosForSpace = async (spaceId: string): Promise<Todo[]> => {
   const snapshot = await getDocs(query(todosCol(spaceId), orderBy("order", "asc")));
   return snapshot.docs.map(mapTodo);
 };
+
+// Live subscription to a space's todos (issue #72): returns an unsubscribe
+// function and fires on every change so collaborators see edits in real time.
+export const subscribeTodosForSpace = (
+  spaceId: string,
+  onChange: (todos: Todo[]) => void,
+  onError?: (error: Error) => void
+): Unsubscribe =>
+  onSnapshot(
+    query(todosCol(spaceId), orderBy("order", "asc")),
+    (snap) => onChange(snap.docs.map(mapTodo)),
+    onError
+  );
 
 // Server-side count of open (not completed) todos — drives the sidebar/pill
 // "open" badge per space without fetching every todo.
@@ -269,15 +298,29 @@ export const createDaily = async (
 
 // Open (not completed) daily items. Single-field filter → no composite index;
 // callers split into today's vs. "liegengeblieben" (date < today) client-side.
+const sortDaily = (items: Daily[]): Daily[] =>
+  items.sort((a, b) => (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0));
+
 export const getOpenDailyForSpace = async (spaceId: string): Promise<Daily[]> => {
   if (!spaceId) return [];
   const snapshot = await getDocs(
     query(dailyCol(spaceId), where("completed", "==", false))
   );
-  return snapshot.docs
-    .map(mapDaily)
-    .sort((a, b) => (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0));
+  return sortDaily(snapshot.docs.map(mapDaily));
 };
+
+// Live subscription to a space's open daily items (issue #72): returns an
+// unsubscribe function and fires on every change.
+export const subscribeOpenDailyForSpace = (
+  spaceId: string,
+  onChange: (items: Daily[]) => void,
+  onError?: (error: Error) => void
+): Unsubscribe =>
+  onSnapshot(
+    query(dailyCol(spaceId), where("completed", "==", false)),
+    (snap) => onChange(sortDaily(snap.docs.map(mapDaily))),
+    onError
+  );
 
 // "Liegengeblieben": an open daily item from before today.
 export const isStaleDaily = (d: Daily, today: string = todayString()): boolean =>
