@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { useToast } from "@/lib/contexts/ToastContext";
 import {
   getSpacesForUser,
+  subscribeSpacesForUser,
   getOpenTodoCount,
   createSpace as createSpaceDoc,
   addSpaceMember,
@@ -56,6 +57,17 @@ export const SpacesProvider = ({ children }: { children: ReactNode }) => {
   const [openCounts, setOpenCounts] = useState<Record<string, number>>({});
   const [view, setView] = useState<SpaceView>("liste");
 
+  const applyLoaded = useCallback((loaded: Space[]) => {
+    setSpaces(loaded);
+    // Keep the current selection if it still exists, else default to the first.
+    setActiveSpaceId((prev) =>
+      prev && loaded.some((s) => s.id === prev) ? prev : loaded[0]?.id ?? null
+    );
+    setLoading(false);
+  }, []);
+
+  // Manual one-shot reload, kept as a fallback. Live updates flow through the
+  // onSnapshot subscription below (issue #72), so mutations no longer call this.
   const refreshSpaces = useCallback(async () => {
     if (!user) {
       setSpaces([]);
@@ -64,39 +76,60 @@ export const SpacesProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    const loaded = await getSpacesForUser(user.uid);
-    setSpaces(loaded);
-    // Keep the current selection if it still exists, else default to the first.
-    setActiveSpaceId((prev) =>
-      prev && loaded.some((s) => s.id === prev) ? prev : loaded[0]?.id ?? null
-    );
-    setLoading(false);
+    applyLoaded(await getSpacesForUser(user.uid));
+  }, [user, applyLoaded]);
 
-    // Open-todo counts are best-effort: a failure must not break the shell.
-    const counts: Record<string, number> = {};
-    await Promise.all(
-      loaded.map(async (s) => {
-        try {
-          counts[s.id] = await getOpenTodoCount(s.id);
-        } catch {
-          /* ignore per-space count errors */
-        }
-      })
-    );
-    setOpenCounts(counts);
-  }, [user]);
-
+  // Live subscription to the user's spaces (issue #72): a space created, renamed
+  // or shared by a collaborator now appears without a manual reload.
   useEffect(() => {
-    refreshSpaces();
-  }, [refreshSpaces]);
+    if (!user) {
+      setSpaces([]);
+      setActiveSpaceId(null);
+      setOpenCounts({});
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const unsubscribe = subscribeSpacesForUser(user.uid, applyLoaded, (e) => {
+      console.error("spaces subscription failed", e);
+      showError("Spaces konnten nicht geladen werden.");
+      setLoading(false);
+    });
+    return unsubscribe;
+  }, [user, applyLoaded, showError]);
+
+  // Open-todo counts per space (sidebar badges). Best-effort, recomputed when
+  // the set of spaces changes; the active space's count is also kept live by
+  // TodosContext via setOpenCount. A failure must not break the shell.
+  const spaceIdsKey = spaces.map((s) => s.id).join(",");
+  useEffect(() => {
+    if (!spaceIdsKey) return;
+    let cancelled = false;
+    (async () => {
+      const ids = spaceIdsKey.split(",");
+      const counts: Record<string, number> = {};
+      await Promise.all(
+        ids.map(async (id) => {
+          try {
+            counts[id] = await getOpenTodoCount(id);
+          } catch {
+            /* ignore per-space count errors */
+          }
+        })
+      );
+      if (!cancelled) setOpenCounts((prev) => ({ ...prev, ...counts }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [spaceIdsKey]);
 
   const createSpace = useCallback(
     async (name: string): Promise<string | null> => {
       if (!user || !name.trim()) return null;
       try {
         const id = await createSpaceDoc(user.uid, name, spaces.length);
-        await refreshSpaces();
+        // The new space arrives via the live subscription; select it now.
         setActiveSpaceId(id);
         return id;
       } catch (e) {
@@ -105,33 +138,31 @@ export const SpacesProvider = ({ children }: { children: ReactNode }) => {
         return null;
       }
     },
-    [user, spaces.length, refreshSpaces, showError]
+    [user, spaces.length, showError]
   );
 
   const addMember = useCallback(
     async (spaceId: string, uid: string) => {
       try {
         await addSpaceMember(spaceId, uid);
-        await refreshSpaces();
       } catch (e) {
         console.error("addMember failed", e);
         showError("Mitglied konnte nicht hinzugefügt werden.");
       }
     },
-    [refreshSpaces, showError]
+    [showError]
   );
 
   const removeMember = useCallback(
     async (spaceId: string, uid: string) => {
       try {
         await removeSpaceMember(spaceId, uid);
-        await refreshSpaces();
       } catch (e) {
         console.error("removeMember failed", e);
         showError("Mitglied konnte nicht entfernt werden.");
       }
     },
-    [refreshSpaces, showError]
+    [showError]
   );
 
   const setOpenCount = useCallback((spaceId: string, count: number) => {

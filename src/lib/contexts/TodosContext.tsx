@@ -14,6 +14,7 @@ import { useSpaces } from "@/lib/contexts/SpacesContext";
 import { useToast } from "@/lib/contexts/ToastContext";
 import {
   getTodosForSpace,
+  subscribeTodosForSpace,
   createTodo as createTodoDoc,
   editTodoContent,
   setTodoCompleted,
@@ -61,24 +62,46 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [tagFilters, setTagFilters] = useState<string[]>([]);
 
+  // Manual one-shot reload, kept as a fallback. Live updates flow through the
+  // onSnapshot subscription below (issue #72), so mutations no longer call this.
   const refresh = useCallback(async () => {
     if (!activeSpaceId) {
       setTodos([]);
       setLoading(false);
       return;
     }
-    setLoading(true);
     const loaded = await getTodosForSpace(activeSpaceId);
     setTodos(loaded);
     setLoading(false);
     setOpenCount(activeSpaceId, loaded.filter((t) => !t.completed).length);
   }, [activeSpaceId, setOpenCount]);
 
-  // Reload + reset filters whenever the active space changes.
+  // Live subscription to the active space's todos (issue #72): collaborators'
+  // edits now appear in real time instead of needing a manual reload. Reset the
+  // tag filter on space switch.
   useEffect(() => {
     setTagFilters([]);
-    refresh();
-  }, [refresh]);
+    if (!activeSpaceId) {
+      setTodos([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const unsubscribe = subscribeTodosForSpace(
+      activeSpaceId,
+      (loaded) => {
+        setTodos(loaded);
+        setLoading(false);
+        setOpenCount(activeSpaceId, loaded.filter((t) => !t.completed).length);
+      },
+      (e) => {
+        console.error("todos subscription failed", e);
+        showError("Todos konnten nicht geladen werden.");
+        setLoading(false);
+      }
+    );
+    return unsubscribe;
+  }, [activeSpaceId, setOpenCount, showError]);
 
   const tags = useMemo(() => {
     const set = new Set<string>();
@@ -110,7 +133,6 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
           body: input.body ?? null,
           order: maxOrder + 1,
         });
-        await refresh();
         return true;
       } catch (e) {
         console.error("createTodo failed", e);
@@ -118,7 +140,7 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
     },
-    [activeSpaceId, user, todos, refresh, showError]
+    [activeSpaceId, user, todos, showError]
   );
 
   const editContent = useCallback(
@@ -126,7 +148,6 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
       if (!activeSpaceId) return false;
       try {
         await editTodoContent(activeSpaceId, id, title, body);
-        await refresh();
         return true;
       } catch (e) {
         console.error("editContent failed", e);
@@ -134,7 +155,7 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
     },
-    [activeSpaceId, refresh, showError]
+    [activeSpaceId, showError]
   );
 
   const setCompleted = useCallback(
@@ -142,13 +163,12 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
       if (!activeSpaceId) return;
       try {
         await setTodoCompleted(activeSpaceId, id, completed);
-        await refresh();
       } catch (e) {
         console.error("setCompleted failed", e);
         showError("Status konnte nicht geändert werden.");
       }
     },
-    [activeSpaceId, refresh, showError]
+    [activeSpaceId, showError]
   );
 
   const setWaitingOn = useCallback(
@@ -156,13 +176,12 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
       if (!activeSpaceId) return;
       try {
         await setTodoWaitingOn(activeSpaceId, id, waitingOn);
-        await refresh();
       } catch (e) {
         console.error("setWaitingOn failed", e);
         showError("Zuweisung konnte nicht gespeichert werden.");
       }
     },
-    [activeSpaceId, refresh, showError]
+    [activeSpaceId, showError]
   );
 
   const remove = useCallback(
@@ -170,13 +189,12 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
       if (!activeSpaceId) return;
       try {
         await deleteTodo(activeSpaceId, id);
-        await refresh();
       } catch (e) {
         console.error("remove failed", e);
         showError("Todo konnte nicht gelöscht werden.");
       }
     },
-    [activeSpaceId, refresh, showError]
+    [activeSpaceId, showError]
   );
 
   const value: TodosContextType = {

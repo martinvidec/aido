@@ -14,6 +14,7 @@ import { useSpaces } from "@/lib/contexts/SpacesContext";
 import { useToast } from "@/lib/contexts/ToastContext";
 import {
   getOpenDailyForSpace,
+  subscribeOpenDailyForSpace,
   createDaily,
   setDailyCompleted,
   deleteDaily,
@@ -49,21 +50,41 @@ export const DailyProvider = ({ children }: { children: ReactNode }) => {
   const [items, setItems] = useState<Daily[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Manual one-shot reload, kept as a fallback. Live updates flow through the
+  // onSnapshot subscription below (issue #72), so mutations no longer call this.
   const refresh = useCallback(async () => {
     if (!activeSpaceId) {
       setItems([]);
       setLoading(false);
       return;
     }
-    setLoading(true);
     const loaded = await getOpenDailyForSpace(activeSpaceId);
     setItems(loaded);
     setLoading(false);
   }, [activeSpaceId]);
 
+  // Live subscription to the active space's open daily items (issue #72).
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    if (!activeSpaceId) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const unsubscribe = subscribeOpenDailyForSpace(
+      activeSpaceId,
+      (loaded) => {
+        setItems(loaded);
+        setLoading(false);
+      },
+      (e) => {
+        console.error("daily subscription failed", e);
+        showError("Heute-Einträge konnten nicht geladen werden.");
+        setLoading(false);
+      }
+    );
+    return unsubscribe;
+  }, [activeSpaceId, showError]);
 
   const todayStr = todayString();
   const today = useMemo(() => items.filter((d) => d.date === todayStr), [items, todayStr]);
@@ -74,7 +95,6 @@ export const DailyProvider = ({ children }: { children: ReactNode }) => {
       if (!activeSpaceId || !user || !text.trim()) return false;
       try {
         await createDaily(activeSpaceId, user.uid, text);
-        await refresh();
         return true;
       } catch (e) {
         console.error("daily add failed", e);
@@ -82,7 +102,7 @@ export const DailyProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
     },
-    [activeSpaceId, user, refresh, showError]
+    [activeSpaceId, user, showError]
   );
 
   const setCompleted = useCallback(
@@ -90,7 +110,6 @@ export const DailyProvider = ({ children }: { children: ReactNode }) => {
       if (!activeSpaceId) return false;
       try {
         await setDailyCompleted(activeSpaceId, id, completed);
-        await refresh();
         return true;
       } catch (e) {
         console.error("daily setCompleted failed", e);
@@ -98,7 +117,7 @@ export const DailyProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
     },
-    [activeSpaceId, refresh, showError]
+    [activeSpaceId, showError]
   );
 
   const remove = useCallback(
@@ -106,13 +125,12 @@ export const DailyProvider = ({ children }: { children: ReactNode }) => {
       if (!activeSpaceId) return;
       try {
         await deleteDaily(activeSpaceId, id);
-        await refresh();
       } catch (e) {
         console.error("daily remove failed", e);
         showError("Konnte nicht gelöscht werden.");
       }
     },
-    [activeSpaceId, refresh, showError]
+    [activeSpaceId, showError]
   );
 
   const value: DailyContextType = { today, stale, loading, add, setCompleted, remove, refresh };
