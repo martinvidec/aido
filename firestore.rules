@@ -105,15 +105,32 @@ service cloud.firestore {
               || (request.resource.data.waitingOn is string
                   && request.resource.data.waitingOn in thisSpaceMembers());
         }
+        // Type/shape of the scalar fields the client and queries rely on
+        // (issue #71). Without these a bad/hostile client could write
+        // completed:42, order:'x' or title:{} and break orderBy('order'),
+        // the open-todo count, and reads for every other member. Checked on
+        // create AND update — partial updates merge into the full doc, so the
+        // unchanged fields are validated against their stored values too.
+        function hasValidTodoFields() {
+          return request.resource.data.title is string
+              && request.resource.data.completed is bool
+              && request.resource.data.order is number
+              && request.resource.data.spaceId == spaceId
+              && (!('body' in request.resource.data)
+                  || request.resource.data.body == null
+                  || request.resource.data.body is map);
+        }
 
         allow read: if isMemberOfThisSpace();
         allow create: if isMemberOfThisSpace()
           && request.resource.data.createdBy == request.auth.uid
           && hasValidTodoLists()
+          && hasValidTodoFields()
           && hasValidWaitingOn();
         allow update: if isMemberOfThisSpace()
           && request.resource.data.createdBy == resource.data.createdBy
           && hasValidTodoLists()
+          && hasValidTodoFields()
           && hasValidWaitingOn();
         allow delete: if isMemberOfThisSpace();
       }
@@ -121,13 +138,25 @@ service cloud.firestore {
       // Daily "Heute" items (issue #41): short-lived, space-scoped, kept separate
       // from todos. Any member may read/write; author is immutable.
       match /daily/{dailyId} {
+        // Field types the client/queries depend on (issue #71): `completed`
+        // drives the open-daily query and `date` (strict YYYY-MM-DD) drives the
+        // today/"liegengeblieben" split — an empty or malformed date would make
+        // an open daily invisible (the edge case deferred from #70).
+        function hasValidDailyFields() {
+          return request.resource.data.text is string
+              && request.resource.data.completed is bool
+              && request.resource.data.spaceId == spaceId
+              && request.resource.data.date is string
+              && request.resource.data.date.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$');
+        }
+
         allow read: if isMemberOfThisSpace();
         allow create: if isMemberOfThisSpace()
           && request.resource.data.author == request.auth.uid
-          && request.resource.data.text is string
-          && request.resource.data.date is string;
+          && hasValidDailyFields();
         allow update: if isMemberOfThisSpace()
-          && request.resource.data.author == resource.data.author;
+          && request.resource.data.author == resource.data.author
+          && hasValidDailyFields();
         allow delete: if isMemberOfThisSpace();
       }
     }

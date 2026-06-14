@@ -295,6 +295,31 @@ await check('member may not create a todo with non-list tags', assertFails(
   setDoc(doc(db(ALICE), `spaces/${TS}/todos/t5`), {
     spaceId: TS, title: 'x', completed: false, waitingOn: null,
     tags: 'a', mentions: [], createdBy: ALICE, createdAt: 1, order: 1 })));
+// Field-type validation (issue #71).
+await check('member may not create a todo with non-string title', assertFails(
+  setDoc(doc(db(ALICE), `spaces/${TS}/todos/t6`), {
+    spaceId: TS, title: 42, completed: false, waitingOn: null,
+    tags: [], mentions: [], createdBy: ALICE, createdAt: 1, order: 1 })));
+await check('member may not create a todo with non-bool completed', assertFails(
+  setDoc(doc(db(ALICE), `spaces/${TS}/todos/t7`), {
+    spaceId: TS, title: 'x', completed: 42, waitingOn: null,
+    tags: [], mentions: [], createdBy: ALICE, createdAt: 1, order: 1 })));
+await check('member may not create a todo with non-number order', assertFails(
+  setDoc(doc(db(ALICE), `spaces/${TS}/todos/t8`), {
+    spaceId: TS, title: 'x', completed: false, waitingOn: null,
+    tags: [], mentions: [], createdBy: ALICE, createdAt: 1, order: 'x' })));
+await check('member may not create a todo with a mismatched spaceId', assertFails(
+  setDoc(doc(db(ALICE), `spaces/${TS}/todos/t9`), {
+    spaceId: 'other-space', title: 'x', completed: false, waitingOn: null,
+    tags: [], mentions: [], createdBy: ALICE, createdAt: 1, order: 1 })));
+await check('member may not create a todo with a non-map body', assertFails(
+  setDoc(doc(db(ALICE), `spaces/${TS}/todos/t10`), {
+    spaceId: TS, title: 'x', body: 'oops', completed: false, waitingOn: null,
+    tags: [], mentions: [], createdBy: ALICE, createdAt: 1, order: 1 })));
+await check('member may not update completed to a non-bool', assertFails(
+  updateDoc(doc(db(BOB), TODO2_PATH), { completed: 42 })));
+await check('member may not update order to a non-number', assertFails(
+  updateDoc(doc(db(BOB), TODO2_PATH), { order: 'x' })));
 await check('member (non-creator) may edit a todo (content + completed)', assertSucceeds(
   updateDoc(doc(db(BOB), TODO2_PATH), { title: 'edited', completed: true })));
 await check('member may not change a todo createdBy (takeover)', assertFails(
@@ -330,6 +355,19 @@ await check('member may not create a daily item authored by someone else', asser
 await check('non-member may not create a daily item', assertFails(
   setDoc(doc(db(MALLORY), `spaces/${TS}/daily/d4`), {
     spaceId: TS, text: 'x', completed: false, date: '2020-01-02', author: MALLORY, createdAt: 1 })));
+// Field-type validation (issue #71).
+await check('member may not create a daily with a malformed date', assertFails(
+  setDoc(doc(db(BOB), `spaces/${TS}/daily/d5`), {
+    spaceId: TS, text: 'x', completed: false, date: '9999-99-99', author: BOB, createdAt: 1 })));
+await check('member may not create a daily with an empty date', assertFails(
+  setDoc(doc(db(BOB), `spaces/${TS}/daily/d6`), {
+    spaceId: TS, text: 'x', completed: false, date: '', author: BOB, createdAt: 1 })));
+await check('member may not create a daily with non-bool completed', assertFails(
+  setDoc(doc(db(BOB), `spaces/${TS}/daily/d7`), {
+    spaceId: TS, text: 'x', completed: 'yes', date: '2020-01-02', author: BOB, createdAt: 1 })));
+await check('member may not create a daily with a mismatched spaceId', assertFails(
+  setDoc(doc(db(BOB), `spaces/${TS}/daily/d8`), {
+    spaceId: 'other-space', text: 'x', completed: false, date: '2020-01-02', author: BOB, createdAt: 1 })));
 await check('member (non-author) may toggle daily completed', assertSucceeds(
   updateDoc(doc(db(BOB), DAILY_PATH), { completed: true })));
 await check('member may not change a daily author', assertFails(
