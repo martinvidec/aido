@@ -69,10 +69,12 @@ Model Context Protocol endpoint with `streamable-http` (POST) and SSE (GET) tran
 
 ## Deployment
 
+The `firebase` CLI is **not installed globally** (a bare `firebase …` gives "command not found"). Prefix every Firebase command with `npx -y firebase-tools@13` — the same v13 pin the rules tests use (v15+ needs Java 21 / Node ≤22; this machine has Java 11 / Node 25). First-time auth: `npx -y firebase-tools@13 login`. The default project (`template-2-20926`) is set in `.firebaserc`.
+
 - App: merges to `main` auto-deploy via Vercel.
-- Firestore rules: `firebase deploy --only firestore:rules`. Deploy **after** the app when rules depend on new app behavior (e.g. a tightened read rule that the old client would break on).
-- Storage rules: `firebase deploy --only storage` (only once Storage is enabled in the Firebase console — it is not currently set up).
-- Cloud Functions: `cd functions && npm run deploy`.
+- Firestore rules: `npx -y firebase-tools@13 deploy --only firestore:rules`. Deploy **after** the app when rules depend on new app behavior (e.g. a tightened read rule that the old client would break on).
+- Storage rules: `npx -y firebase-tools@13 deploy --only storage` (only once Storage is enabled in the Firebase console — it is not currently set up).
+- Cloud Functions: `npx -y firebase-tools@13 deploy --only functions` (the `functions/` `npm run deploy` script calls a bare `firebase` and will fail without a global install).
 - **Legacy-todo migration (one-time, issue #66):** the client-lazy migration only runs on the owner's login, so sharees stay stranded until the owner logs in again. Run `npm run migrate:legacy` once against prod (`FIREBASE_SERVICE_ACCOUNT_KEY` set; add `--dry-run` first) to migrate **all** users up front. It mirrors the client's deterministic space ids/markers, so it's idempotent and safe to interleave with client runs. Smoke-test it against the emulator with `npm run test:migration`.
 
 ## Environment
