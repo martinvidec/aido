@@ -96,6 +96,18 @@ function firstLine(text) {
     .find(Boolean) ?? "";
 }
 
+// First non-empty block's text of a Tiptap body — title fallback for legacy
+// todos created purely via the editor (empty `text`) (issue #69).
+function firstBodyLine(body) {
+  const blocks = body?.content;
+  if (!Array.isArray(blocks)) return "";
+  for (const block of blocks) {
+    const text = extractPlainText(block).trim();
+    if (text) return text;
+  }
+  return "";
+}
+
 function memberSetKey(members) {
   return [...new Set(members)].sort().join(",");
 }
@@ -190,7 +202,7 @@ export async function migrateOwner(db, uid, { dryRun = false } = {}) {
 
     const plain = typeof data.text === "string" ? data.text : "";
     const body = data.content && typeof data.content === "object" ? data.content : null;
-    const title = firstLine(plain) || "(ohne Titel)";
+    const title = firstLine(plain) || firstBodyLine(body) || "(ohne Titel)";
     const tags = Array.isArray(data.tags) && data.tags.length ? data.tags : deriveTags(title, body);
     const mentions = Array.isArray(data.mentionedUsers) ? data.mentionedUsers : deriveMentions(body);
 
