@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-rules-test \"node tests/firestore-rules.test.mjs && node tests/storage-rules.test.mjs\""
+    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-rules-test \"node tests/firestore-rules.test.mjs && node tests/storage-rules.test.mjs\"",
+    "test:migration": "firebase emulators:exec --only firestore --project demo-migration \"node tests/migration-admin.test.mjs\"",
+    "migrate:legacy": "node scripts/migrate-legacy-todos-admin.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
