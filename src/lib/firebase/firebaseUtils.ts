@@ -17,6 +17,7 @@ import {
   where,
   serverTimestamp,
   writeBatch,
+  runTransaction,
   limit,
   orderBy,
   arrayUnion,
@@ -746,6 +747,14 @@ export const cancelOutgoingRequest = async (
 // (e.g. after a partial failure). Rollback: delete the created spaces and clear
 // the user flag / `migratedTo` markers; the original todos are untouched. Export
 // Firestore before relying on the result.
+//
+// Concurrency (issue #65): two tabs/devices logging in at the same time both
+// pass the flag check, so the run must be safe to execute twice in parallel.
+// Two guarantees make it so: (1) migration spaces use DETERMINISTIC ids and are
+// created via an ensure-if-absent transaction, so concurrent runs converge on
+// the same space instead of each forging its own; (2) each legacy todo is
+// migrated inside its OWN transaction that re-reads the `migratedTo` marker
+// before writing, so the loser of a race skips instead of creating a duplicate.
 
 const TODOS_MIGRATION_FLAG = "todosMigratedToSpacesAt";
 // Guards against concurrent runs within a session (the user-doc snapshot can
@@ -761,6 +770,13 @@ const firstLine = (text: string): string =>
 const memberSetKey = (members: string[]): string =>
   [...new Set(members)].sort().join(",");
 
+// Deterministic id for a migration space, so concurrent runs target the SAME
+// doc. `key` is null for the default "Privat" space and the member-set key for a
+// "Geteilt" space; non-alphanumerics are collapsed since uids may be joined by
+// commas and doc ids must not contain "/".
+const migrationSpaceId = (uid: string, key: string | null): string =>
+  `mig_${uid}_${(key ?? "privat").replace(/[^A-Za-z0-9]+/g, "_")}`;
+
 export const migrateLegacyTodos = async (uid: string): Promise<void> => {
   if (!uid || migrationInFlight.has(uid)) return;
   migrationInFlight.add(uid);
@@ -775,32 +791,45 @@ export const migrateLegacyTodos = async (uid: string): Promise<void> => {
       return;
     }
 
-    // Reuse migration-marked spaces from a previous (partial) run.
+    // Prefer a space already created by a previous (possibly old-style, random-
+    // id) migration run; otherwise fall back to the deterministic id.
     const spacesSnap = await getDocs(
       query(collection(db, SPACES_COLLECTION), where("members", "array-contains", uid))
     );
     const ownSpaces = spacesSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as Array<
       DocumentData & { id: string }
     >;
-
-    let privatId =
-      ownSpaces.find((s) => s.migratedDefault === true && s.createdBy === uid)?.id ?? null;
-    if (!privatId) {
-      const ref = await addDoc(collection(db, SPACES_COLLECTION), {
-        name: "Privat",
-        color: getSpaceColor(0).hue,
-        members: [uid],
-        createdBy: uid,
-        createdAt: serverTimestamp(),
-        migratedDefault: true,
-      });
-      privatId = ref.id;
-    }
-
-    const sharedByKey = new Map<string, string>();
+    const existingDefault = ownSpaces.find(
+      (s) => s.migratedDefault === true && s.createdBy === uid
+    )?.id;
+    const existingShared = new Map<string, string>();
     for (const s of ownSpaces) {
-      if (s.migratedShareKey && s.createdBy === uid) sharedByKey.set(s.migratedShareKey, s.id);
+      if (s.migratedShareKey && s.createdBy === uid) existingShared.set(s.migratedShareKey, s.id);
     }
+
+    // Create a migration space only if it doesn't exist yet, atomically: two
+    // concurrent runs both run this transaction on the same deterministic id, so
+    // exactly one wins the create and the other becomes a no-op (issue #65).
+    const ensuredSpaces = new Set<string>();
+    const ensureSpace = async (
+      spaceId: string,
+      space: { name: string; color: number; members: string[]; marker: Record<string, unknown> }
+    ): Promise<void> => {
+      if (ensuredSpaces.has(spaceId)) return;
+      await runTransaction(db, async (tx) => {
+        const ref = doc(db, SPACES_COLLECTION, spaceId);
+        if ((await tx.get(ref)).exists()) return;
+        tx.set(ref, {
+          name: space.name,
+          color: space.color,
+          members: space.members,
+          createdBy: uid,
+          createdAt: serverTimestamp(),
+          ...space.marker,
+        });
+      });
+      ensuredSpaces.add(spaceId);
+    };
 
     let migrated = 0;
     let order = 0;
@@ -814,24 +843,23 @@ export const migrateLegacyTodos = async (uid: string): Promise<void> => {
 
       let targetSpaceId: string;
       if (sharedWith.length === 0) {
-        targetSpaceId = privatId;
+        targetSpaceId = existingDefault ?? migrationSpaceId(uid, null);
+        await ensureSpace(targetSpaceId, {
+          name: "Privat",
+          color: getSpaceColor(0).hue,
+          members: [uid],
+          marker: { migratedDefault: true },
+        });
       } else {
         const members = [uid, ...sharedWith];
         const key = memberSetKey(members);
-        let sid = sharedByKey.get(key);
-        if (!sid) {
-          const ref = await addDoc(collection(db, SPACES_COLLECTION), {
-            name: "Geteilt",
-            color: getSpaceColor(1).hue,
-            members,
-            createdBy: uid,
-            createdAt: serverTimestamp(),
-            migratedShareKey: key,
-          });
-          sid = ref.id;
-          sharedByKey.set(key, sid);
-        }
-        targetSpaceId = sid;
+        targetSpaceId = existingShared.get(key) ?? migrationSpaceId(uid, key);
+        await ensureSpace(targetSpaceId, {
+          name: "Geteilt",
+          color: getSpaceColor(1).hue,
+          members,
+          marker: { migratedShareKey: key },
+        });
       }
 
       const plain = typeof data.text === "string" ? data.text : "";
@@ -844,23 +872,38 @@ export const migrateLegacyTodos = async (uid: string): Promise<void> => {
         ? data.mentionedUsers
         : deriveMentions(body);
 
-      const newTodoRef = await addDoc(collection(db, SPACES_COLLECTION, targetSpaceId, "todos"), {
-        spaceId: targetSpaceId,
-        title,
-        body,
-        completed: data.completed === true,
-        waitingOn: null,
-        tags,
-        mentions,
-        createdBy: uid,
-        createdAt: serverTimestamp(),
-        order: order++,
+      // One transaction per legacy todo: re-read the marker and, only if still
+      // unmigrated, create the new todo and tag the legacy doc in the same
+      // atomic step. A concurrent run racing on the same todo loses the
+      // transaction, re-reads `migratedTo`, and skips — so no duplicate todo is
+      // ever created (issue #65). The new todo's id is generated client-side so
+      // it can be referenced inside the transaction.
+      const newTodoRef = doc(collection(db, SPACES_COLLECTION, targetSpaceId, "todos"));
+      const created = await runTransaction(db, async (tx) => {
+        const legacyRef = doc(db, "users", uid, "todos", d.id);
+        const fresh = await tx.get(legacyRef);
+        if (!fresh.exists() || fresh.data()?.migratedTo) return false;
+        tx.set(newTodoRef, {
+          spaceId: targetSpaceId,
+          title,
+          body,
+          completed: data.completed === true,
+          waitingOn: null,
+          tags,
+          mentions,
+          createdBy: uid,
+          createdAt: serverTimestamp(),
+          order,
+        });
+        tx.update(legacyRef, {
+          migratedTo: `${SPACES_COLLECTION}/${targetSpaceId}/todos/${newTodoRef.id}`,
+        });
+        return true;
       });
-
-      await updateDoc(doc(db, "users", uid, "todos", d.id), {
-        migratedTo: `${SPACES_COLLECTION}/${targetSpaceId}/todos/${newTodoRef.id}`,
-      });
-      migrated++;
+      if (created) {
+        order++;
+        migrated++;
+      }
     }
 
     await setDoc(userRef, { [TODOS_MIGRATION_FLAG]: serverTimestamp() }, { merge: true });
