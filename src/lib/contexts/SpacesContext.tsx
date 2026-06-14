@@ -5,6 +5,7 @@ import React, {
   useContext,
   useState,
   useEffect,
+  useRef,
   useCallback,
   ReactNode,
 } from "react";
@@ -98,31 +99,49 @@ export const SpacesProvider = ({ children }: { children: ReactNode }) => {
     return unsubscribe;
   }, [user, applyLoaded, showError]);
 
-  // Open-todo counts per space (sidebar badges). Best-effort, recomputed when
-  // the set of spaces changes; the active space's count is also kept live by
-  // TodosContext via setOpenCount. A failure must not break the shell.
-  const spaceIdsKey = spaces.map((s) => s.id).join(",");
+  // Open-todo counts per space for the sidebar/pill badges (best-effort; a
+  // failure must not break the shell). Single source per space (issue #77):
+  //  - The ACTIVE space's count comes solely from TodosContext, which derives it
+  //    from its live onSnapshot and pushes it via setOpenCount. We never server-
+  //    count the active space, so there is no second source to drift/flicker
+  //    against.
+  //  - Every OTHER space is server-counted exactly once (getCountFromServer),
+  //    the first time it's seen as non-active (tracked in countedRef) — instead
+  //    of recomputing all spaces on every change. When a space later switches
+  //    from active to non-active it gets counted then, refreshing it.
+  const countedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (!spaceIdsKey) return;
+    const toCount = spaces
+      .filter((s) => s.id !== activeSpaceId && !countedRef.current.has(s.id))
+      .map((s) => s.id);
+    if (toCount.length === 0) return;
     let cancelled = false;
     (async () => {
-      const ids = spaceIdsKey.split(",");
-      const counts: Record<string, number> = {};
-      await Promise.all(
-        ids.map(async (id) => {
+      const results = await Promise.all(
+        toCount.map(async (id) => {
           try {
-            counts[id] = await getOpenTodoCount(id);
+            return [id, await getOpenTodoCount(id)] as const;
           } catch {
-            /* ignore per-space count errors */
+            return [id, null] as const; // count again on a later run
           }
         })
       );
-      if (!cancelled) setOpenCounts((prev) => ({ ...prev, ...counts }));
+      if (cancelled) return;
+      const counts: Record<string, number> = {};
+      for (const [id, count] of results) {
+        if (count !== null) {
+          counts[id] = count;
+          countedRef.current.add(id);
+        }
+      }
+      if (Object.keys(counts).length > 0) {
+        setOpenCounts((prev) => ({ ...prev, ...counts }));
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [spaceIdsKey]);
+  }, [spaces, activeSpaceId]);
 
   const createSpace = useCallback(
     async (name: string): Promise<string | null> => {
