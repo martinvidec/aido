@@ -33,10 +33,16 @@ function NewSpaceForm({ onDone }: { onDone: () => void }) {
     const value = name.trim();
     if (!value) return;
     setBusy(true);
-    await createSpace(value);
-    setBusy(false);
-    setName("");
-    onDone();
+    try {
+      const id = await createSpace(value);
+      // Only clear/close on success; keep the input on failure (toast shown) (#68).
+      if (id) {
+        setName("");
+        onDone();
+      }
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (

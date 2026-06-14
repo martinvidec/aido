@@ -25,10 +25,17 @@ export default function NewSpaceButton() {
       return;
     }
     setBusy(true);
-    await createSpace(value);
-    setBusy(false);
-    setName("");
-    setEditing(false);
+    try {
+      const id = await createSpace(value);
+      // Keep the input open with the typed name on failure so it can be retried
+      // (createSpace shows an error toast); only clear/close on success (#68).
+      if (id) {
+        setName("");
+        setEditing(false);
+      }
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (!editing) {

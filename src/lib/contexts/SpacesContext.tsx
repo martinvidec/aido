@@ -9,6 +9,7 @@ import React, {
   ReactNode,
 } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { useToast } from "@/lib/contexts/ToastContext";
 import {
   getSpacesForUser,
   getOpenTodoCount,
@@ -48,6 +49,7 @@ const SpacesContext = createContext<SpacesContextType | undefined>(undefined);
  */
 export const SpacesProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
+  const { showError } = useToast();
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
@@ -92,28 +94,44 @@ export const SpacesProvider = ({ children }: { children: ReactNode }) => {
   const createSpace = useCallback(
     async (name: string): Promise<string | null> => {
       if (!user || !name.trim()) return null;
-      const id = await createSpaceDoc(user.uid, name, spaces.length);
-      await refreshSpaces();
-      setActiveSpaceId(id);
-      return id;
+      try {
+        const id = await createSpaceDoc(user.uid, name, spaces.length);
+        await refreshSpaces();
+        setActiveSpaceId(id);
+        return id;
+      } catch (e) {
+        console.error("createSpace failed", e);
+        showError("Space konnte nicht erstellt werden.");
+        return null;
+      }
     },
-    [user, spaces.length, refreshSpaces]
+    [user, spaces.length, refreshSpaces, showError]
   );
 
   const addMember = useCallback(
     async (spaceId: string, uid: string) => {
-      await addSpaceMember(spaceId, uid);
-      await refreshSpaces();
+      try {
+        await addSpaceMember(spaceId, uid);
+        await refreshSpaces();
+      } catch (e) {
+        console.error("addMember failed", e);
+        showError("Mitglied konnte nicht hinzugefügt werden.");
+      }
     },
-    [refreshSpaces]
+    [refreshSpaces, showError]
   );
 
   const removeMember = useCallback(
     async (spaceId: string, uid: string) => {
-      await removeSpaceMember(spaceId, uid);
-      await refreshSpaces();
+      try {
+        await removeSpaceMember(spaceId, uid);
+        await refreshSpaces();
+      } catch (e) {
+        console.error("removeMember failed", e);
+        showError("Mitglied konnte nicht entfernt werden.");
+      }
     },
-    [refreshSpaces]
+    [refreshSpaces, showError]
   );
 
   const setOpenCount = useCallback((spaceId: string, count: number) => {

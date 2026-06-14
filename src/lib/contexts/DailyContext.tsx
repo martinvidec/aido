@@ -11,6 +11,7 @@ import React, {
 } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useSpaces } from "@/lib/contexts/SpacesContext";
+import { useToast } from "@/lib/contexts/ToastContext";
 import {
   getOpenDailyForSpace,
   createDaily,
@@ -27,7 +28,8 @@ interface DailyContextType {
   /** Open daily items from before today ("liegengeblieben"). */
   stale: Daily[];
   loading: boolean;
-  add: (text: string) => Promise<void>;
+  /** Returns true on success; on failure shows an error toast and returns false. */
+  add: (text: string) => Promise<boolean>;
   setCompleted: (id: string, completed: boolean) => Promise<void>;
   remove: (id: string) => Promise<void>;
   refresh: () => Promise<void>;
@@ -42,6 +44,7 @@ const DailyContext = createContext<DailyContextType | undefined>(undefined);
 export const DailyProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const { activeSpaceId } = useSpaces();
+  const { showError } = useToast();
   const [items, setItems] = useState<Daily[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -66,30 +69,47 @@ export const DailyProvider = ({ children }: { children: ReactNode }) => {
   const stale = useMemo(() => items.filter((d) => isStaleDaily(d, todayStr)), [items, todayStr]);
 
   const add = useCallback(
-    async (text: string) => {
-      if (!activeSpaceId || !user || !text.trim()) return;
-      await createDaily(activeSpaceId, user.uid, text);
-      await refresh();
+    async (text: string): Promise<boolean> => {
+      if (!activeSpaceId || !user || !text.trim()) return false;
+      try {
+        await createDaily(activeSpaceId, user.uid, text);
+        await refresh();
+        return true;
+      } catch (e) {
+        console.error("daily add failed", e);
+        showError("Konnte nicht gesendet werden.");
+        return false;
+      }
     },
-    [activeSpaceId, user, refresh]
+    [activeSpaceId, user, refresh, showError]
   );
 
   const setCompleted = useCallback(
     async (id: string, completed: boolean) => {
       if (!activeSpaceId) return;
-      await setDailyCompleted(activeSpaceId, id, completed);
-      await refresh();
+      try {
+        await setDailyCompleted(activeSpaceId, id, completed);
+        await refresh();
+      } catch (e) {
+        console.error("daily setCompleted failed", e);
+        showError("Status konnte nicht geändert werden.");
+      }
     },
-    [activeSpaceId, refresh]
+    [activeSpaceId, refresh, showError]
   );
 
   const remove = useCallback(
     async (id: string) => {
       if (!activeSpaceId) return;
-      await deleteDaily(activeSpaceId, id);
-      await refresh();
+      try {
+        await deleteDaily(activeSpaceId, id);
+        await refresh();
+      } catch (e) {
+        console.error("daily remove failed", e);
+        showError("Konnte nicht gelöscht werden.");
+      }
     },
-    [activeSpaceId, refresh]
+    [activeSpaceId, refresh, showError]
   );
 
   const value: DailyContextType = { today, stale, loading, add, setCompleted, remove, refresh };

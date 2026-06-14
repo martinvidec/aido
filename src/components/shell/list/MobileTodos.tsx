@@ -80,8 +80,8 @@ export default function MobileTodos() {
             submitLabel="Speichern"
             onCancel={() => setEditFor(null)}
             onSave={async (title, body) => {
-              await editContent(editFor.id, title, body);
-              setEditFor(null);
+              // Keep the editor open (edit intact) if the save fails (#68).
+              if (await editContent(editFor.id, title, body)) setEditFor(null);
             }}
           />
         )}
