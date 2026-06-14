@@ -100,6 +100,14 @@ export default function HeuteList() {
     showToast("In die Liste übernommen.");
   };
 
+  // Completing a bubble only loads open dailies, so a finished one disappears.
+  // Offer an immediate undo so an accidental tap isn't unrecoverable (#70).
+  const complete = async (d: Daily) => {
+    if (await setCompleted(d.id, true)) {
+      showToast("Erledigt.", { label: "Rückgängig", onAction: () => setCompleted(d.id, false) });
+    }
+  };
+
   if (today.length === 0 && stale.length === 0) {
     return <p className="text-sm text-text-dim">Noch nichts für heute.</p>;
   }
@@ -115,7 +123,7 @@ export default function HeuteList() {
           daily={d}
           currentUid={user?.uid}
           resolver={resolver}
-          onToggle={() => setCompleted(d.id, true)}
+          onToggle={() => complete(d)}
           onDelete={() => remove(d.id)}
         />
       ))}

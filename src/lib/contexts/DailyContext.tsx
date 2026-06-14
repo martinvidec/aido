@@ -30,7 +30,8 @@ interface DailyContextType {
   loading: boolean;
   /** Returns true on success; on failure shows an error toast and returns false. */
   add: (text: string) => Promise<boolean>;
-  setCompleted: (id: string, completed: boolean) => Promise<void>;
+  /** Returns true on success; on failure shows an error toast and returns false. */
+  setCompleted: (id: string, completed: boolean) => Promise<boolean>;
   remove: (id: string) => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -85,14 +86,16 @@ export const DailyProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const setCompleted = useCallback(
-    async (id: string, completed: boolean) => {
-      if (!activeSpaceId) return;
+    async (id: string, completed: boolean): Promise<boolean> => {
+      if (!activeSpaceId) return false;
       try {
         await setDailyCompleted(activeSpaceId, id, completed);
         await refresh();
+        return true;
       } catch (e) {
         console.error("daily setCompleted failed", e);
         showError("Status konnte nicht geändert werden.");
+        return false;
       }
     },
     [activeSpaceId, refresh, showError]
