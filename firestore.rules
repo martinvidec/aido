@@ -230,11 +230,26 @@ service cloud.firestore {
       }
     }
 
-    // Single authoritative read rule for todos: covers collection group
-    // queries AND direct reads of users/{uid}/todos/{todoId} (path[1] is the
-    // owner's uid). Owner, sharees and mentioned users may read.
+    // Read rule for LEGACY todos only (users/{uid}/todos/{todoId}; path[1] is the
+    // owner's uid). Owner, sharees and mentioned users may read — via a direct
+    // read or a query scoped to one user's subcollection (e.g. the migration).
+    //
+    // Scoped to path[0] == 'users' (issue #80): the recursive wildcard otherwise
+    // also matches the new spaces/{spaceId}/todos — which have their own
+    // membership-based read rule above. Today space todos carry no sharedWith/
+    // mentionedUsers, so the wildcard grants them nothing; but were such a field
+    // ever added, the legacy `uid in sharedWith` predicate would leak access
+    // beyond space membership. The path scope closes that latent bypass.
+    //
+    // Trade-off: path[0] cannot be guaranteed across a cross-collection
+    // collectionGroup('todos') query, so such queries are no longer permitted.
+    // That is intended — the redesign replaced "shared with me" enumeration with
+    // space membership, and no current client runs a legacy collection-group
+    // query (sharees reach migrated todos through their space).
     match /{path=**}/todos/{todoId} {
-       allow read: if isAuthenticated() && (
+       allow read: if isAuthenticated()
+                    && path[0] == 'users'
+                    && (
                        request.auth.uid == path[1] ||
                        (resource.data.sharedWith != null && request.auth.uid in resource.data.sharedWith) ||
                        (resource.data.mentionedUsers != null && request.auth.uid in resource.data.mentionedUsers)
