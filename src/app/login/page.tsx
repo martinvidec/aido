@@ -19,12 +19,12 @@ export default function LoginPage() {
   // Show loading indicator or null while checking auth state
   if (loading || user) {
       // Or a loading spinner
-      return <div className="min-h-screen flex items-center justify-center dark:bg-gray-900">Loading...</div>; 
+      return <div className="min-h-screen flex items-center justify-center bg-bg text-text">Loading...</div>;
   }
 
   // Render Login section only if not loading and no user
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-bg">
       <div className="flex flex-col items-center mb-8">
         <Image
           src="/aido_logo_big.png"
@@ -33,13 +33,13 @@ export default function LoginPage() {
           height={240}
           className="rounded-full mb-4"
         />
-        <h2 className="text-4xl font-bold text-gray-800 dark:text-gray-100 mb-8">
+        <h2 className="text-4xl font-bold text-text mb-8">
           Aido
         </h2>
       </div>
       <button
         onClick={signInWithGoogle}
-        className="inline-flex items-center px-6 py-3 bg-white border border-gray-300 rounded-md shadow-sm text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600 dark:hover:bg-gray-600 dark:focus:ring-offset-gray-900"
+        className="inline-flex items-center px-6 py-3 bg-bg-card border border-border rounded-md shadow-sm text-base font-medium text-text hover:bg-row-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg focus:ring-accent"
       >
         Sign in with Google
       </button>

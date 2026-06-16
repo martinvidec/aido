@@ -25,8 +25,8 @@ export default function ProtectedLayout({
   if (loading || !user) {
     // You can replace this with a nicer loading spinner component
     return (
-        <div className="min-h-screen flex items-center justify-center dark:bg-gray-900">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 dark:border-blue-400"></div>
+        <div className="min-h-screen flex items-center justify-center bg-bg">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
         </div>
     );
   }
