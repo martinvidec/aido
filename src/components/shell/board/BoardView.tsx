@@ -1,39 +1,18 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { useTodos } from "@/lib/contexts/TodosContext";
-import { useSpaces } from "@/lib/contexts/SpacesContext";
-import { useAuth } from "@/lib/hooks/useAuth";
-import { useSpaceMemberNames } from "@/lib/hooks/useMemberProfiles";
-import Avatar from "../Avatar";
+import React, { useState } from "react";
 import BoardGroupToggle from "./BoardGroupToggle";
+import ColumnHeader from "./ColumnHeader";
 import TodoCard from "./TodoCard";
-import { buildColumns, type BoardColumn, type GroupBy } from "./columns";
+import { useBoardColumns } from "./useBoardColumns";
+import { type BoardColumn, type GroupBy } from "./columns";
 
 /** Desktop Board view (issue #46): horizontal columns with HTML5 drag & drop. */
 export default function BoardView() {
-  const { todos, loading, setWaitingOn, setStatus } = useTodos();
-  const { activeSpace, accent } = useSpaces();
-  const { user } = useAuth();
-  const nameOf = useSpaceMemberNames();
-
   const [groupBy, setGroupBy] = useState<GroupBy>("person");
+  const { columns, loading, accent, nameOf } = useBoardColumns(groupBy);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
-
-  const columns = useMemo(
-    () =>
-      buildColumns({
-        groupBy,
-        todos,
-        members: activeSpace?.members ?? [],
-        currentUid: user?.uid,
-        nameOf,
-        setWaitingOn,
-        setStatus,
-      }),
-    [groupBy, todos, activeSpace, user, nameOf, setWaitingOn, setStatus]
-  );
 
   const onDrop = async (col: BoardColumn) => {
     const id = dragId;
@@ -77,11 +56,7 @@ export default function BoardView() {
                 transition: "background 0.15s, border-color 0.15s",
               }}
             >
-              <div className="flex items-center gap-2 px-1 pb-1">
-                {col.badgeUid && <Avatar uid={col.badgeUid} name={nameOf(col.badgeUid)} size={20} />}
-                <span className="text-xs font-extrabold uppercase tracking-wide text-text-dim">{col.label}</span>
-                {col.todos.length > 0 && <span className="ml-auto text-xs text-text-dim">{col.todos.length}</span>}
-              </div>
+              <ColumnHeader col={col} nameOf={nameOf} className="px-1 pb-1" />
               {col.todos.map((t) => (
                 <TodoCard
                   key={t.id}

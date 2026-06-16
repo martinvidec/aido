@@ -1,41 +1,25 @@
 "use client";
 
 import React, { useState } from "react";
-import { useSpaces } from "@/lib/contexts/SpacesContext";
+import { useCreateSpace } from "./useCreateSpace";
 
 /**
  * Sidebar "+ Neuer Space" entry (issue #47): a dim button that turns into an
  * inline input on click. Enter confirms, Escape/blur cancels.
  */
 export default function NewSpaceButton() {
-  const { createSpace } = useSpaces();
+  const { name, setName, busy, submit } = useCreateSpace();
   const [editing, setEditing] = useState(false);
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
 
   const cancel = () => {
     setName("");
     setEditing(false);
   };
 
-  const submit = async () => {
-    const value = name.trim();
-    if (!value) {
-      cancel();
-      return;
-    }
-    setBusy(true);
-    try {
-      const id = await createSpace(value);
-      // Keep the input open with the typed name on failure so it can be retried
-      // (createSpace shows an error toast); only clear/close on success (#68).
-      if (id) {
-        setName("");
-        setEditing(false);
-      }
-    } finally {
-      setBusy(false);
-    }
+  // Enter on an empty input closes the inline editor (matching the original).
+  const onEnter = () => {
+    if (!name.trim()) cancel();
+    else submit(() => setEditing(false));
   };
 
   if (!editing) {
@@ -57,7 +41,7 @@ export default function NewSpaceButton() {
       disabled={busy}
       onChange={(e) => setName(e.target.value)}
       onKeyDown={(e) => {
-        if (e.key === "Enter") submit();
+        if (e.key === "Enter") onEnter();
         else if (e.key === "Escape") cancel();
       }}
       onBlur={() => {
