@@ -1,7 +1,10 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  darkMode: 'class',
+  // Single theme mechanism (issue #84): `dark:` variants key off the same
+  // `data-theme="dark"` attribute that drives the redesign oklch tokens, so
+  // ThemeContext no longer needs a parallel `.dark` class for the legacy UI.
+  darkMode: ['selector', '[data-theme="dark"]'],
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",

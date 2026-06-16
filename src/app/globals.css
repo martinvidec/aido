@@ -5,9 +5,10 @@
 /* === Redesign design tokens (issue #39) ===========================
  * Source of truth: docs/design_handoff_aido_redesign/README.md → "Design Tokens".
  * Dark is the default (:root); light is an override on html[data-theme="light"].
- * ThemeContext toggles BOTH data-theme (new token system) and the legacy
- * .dark class (existing Tailwind dark: variants) so old and new UI stay in sync
- * during the migration. Tailwind utilities map onto these vars in tailwind.config.ts.
+ * `data-theme` is the single theme mechanism (issue #84): it drives these tokens,
+ * Tailwind's `dark:` variants (darkMode keyed on [data-theme="dark"]), and the
+ * legacy `:is([data-theme="dark"] .ProseMirror …)` overrides below. Tailwind
+ * utilities map onto these vars in tailwind.config.ts.
  */
 :root {
   --bg: oklch(0.22 0.02 270);
@@ -81,7 +82,7 @@ body {
 }
 
 /* Dark mode text color override */
-:is(.dark .ProseMirror) {
+:is([data-theme="dark"] .ProseMirror) {
    color: #f3f4f6 !important; /* Tailwind gray-100 */
 }
 
@@ -153,11 +154,11 @@ body {
 }
 
 /* Dark mode specific overrides if needed */
-:is(.dark .ProseMirror blockquote) {
+:is([data-theme="dark"] .ProseMirror blockquote) {
    border-color: #4b5563 !important; /* Assuming default dark gray-600/700 */
 }
 
-:is(.dark .ProseMirror pre) {
+:is([data-theme="dark"] .ProseMirror pre) {
   background-color: #374151 !important; /* Tailwind gray-700 */
 }
 
@@ -195,7 +196,7 @@ body {
   font-weight: 600; /* ADDED semi-bold */
 }
 
-:is(.dark .ProseMirror .mention) {
+:is([data-theme="dark"] .ProseMirror .mention) {
   color: #bfdbfe; /* Tailwind blue-200 */
   font-weight: 600; /* ADDED semi-bold */
 }
@@ -211,7 +212,7 @@ body {
   text-decoration: underline; /* Underline on hover */
 }
 
-:is(.dark .ProseMirror a) {
+:is([data-theme="dark"] .ProseMirror a) {
   color: #60a5fa; /* Tailwind blue-400 */
 }
 
@@ -221,7 +222,7 @@ body {
   /* font-weight: 600; */ /* Keep semi-bold if desired? */
 }
 
-:is(.dark .ProseMirror .hashtag) {
+:is([data-theme="dark"] .ProseMirror .hashtag) {
   color: #4ade80; /* Tailwind green-400 */
   /* font-weight: 600; */
 }
