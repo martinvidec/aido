@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useSpaces } from "@/lib/contexts/SpacesContext";
+import { useCreateSpace } from "./useCreateSpace";
 import MobileHeader from "./MobileHeader";
 import BottomTabs, { type MobileTab } from "./BottomTabs";
 import BottomSheet from "./BottomSheet";
@@ -26,25 +27,7 @@ function MobileContent({ tab }: { tab: MobileTab }) {
 
 /** "+ Space" creation form, shown inside the bottom sheet (issue #47). */
 function NewSpaceForm({ onDone }: { onDone: () => void }) {
-  const { createSpace } = useSpaces();
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const submit = async () => {
-    const value = name.trim();
-    if (!value) return;
-    setBusy(true);
-    try {
-      const id = await createSpace(value);
-      // Only clear/close on success; keep the input on failure (toast shown) (#68).
-      if (id) {
-        setName("");
-        onDone();
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
+  const { name, setName, busy, submit } = useCreateSpace();
 
   return (
     <div className="flex flex-col gap-3 pb-2">
@@ -54,14 +37,14 @@ function NewSpaceForm({ onDone }: { onDone: () => void }) {
         disabled={busy}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter") submit();
+          if (e.key === "Enter") submit(onDone);
         }}
         placeholder="Space-Name"
         className="rounded-xl border border-border bg-bg-card px-4 py-3 text-base outline-none"
       />
       <button
         type="button"
-        onClick={submit}
+        onClick={() => submit(onDone)}
         disabled={busy || !name.trim()}
         className="rounded-full px-4 text-base font-extrabold text-white disabled:opacity-50"
         style={{ background: "var(--accent)", minHeight: 48 }}
