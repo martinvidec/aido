@@ -1,10 +1,10 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  // Single theme mechanism (issue #84): `dark:` variants key off the same
-  // `data-theme="dark"` attribute that drives the redesign oklch tokens, so
-  // ThemeContext no longer needs a parallel `.dark` class for the legacy UI.
-  darkMode: ['selector', '[data-theme="dark"]'],
+  // No `darkMode` strategy (issue #107): the `dark:` variant is no longer used
+  // anywhere — theming is entirely token-based (oklch CSS vars switched by
+  // `data-theme`, see globals.css). Use the `bg-bg`/`text-text`/… token
+  // utilities for theme-aware styling, never `dark:`.
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
