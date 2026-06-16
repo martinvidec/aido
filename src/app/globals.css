@@ -29,6 +29,9 @@
   --wait-text: oklch(0.82 0.1 75);
   --wait-bg: oklch(0.75 0.14 75 / 0.16);
   --danger: oklch(0.68 0.18 25);
+  --danger-soft: oklch(0.68 0.18 25 / 0.18);
+  --success: oklch(0.72 0.15 150);
+  --success-soft: oklch(0.72 0.15 150 / 0.18);
 
   /* Translucent nav background for the mobile header/tab-bar blur (issue #43). */
   --nav-bg: oklch(0.19 0.02 270 / 0.8);
@@ -52,6 +55,9 @@ html[data-theme="light"] {
   --tag: oklch(0.55 0.12 40);
   --wait-text: oklch(0.5 0.12 75);
   --danger: oklch(0.55 0.2 25);
+  --danger-soft: oklch(0.55 0.2 25 / 0.14);
+  --success: oklch(0.5 0.13 150);
+  --success-soft: oklch(0.5 0.13 150 / 0.14);
 
   --nav-bg: oklch(1 0 0 / 0.8);
   --shadow: 0 8px 28px oklch(0 0 0 / 0.14);
