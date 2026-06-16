@@ -36,22 +36,22 @@ ${error.stack || 'N/A'}
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full">
-        <h2 className="text-xl font-semibold text-red-600 dark:text-red-400 mb-4">Ein Fehler ist aufgetreten</h2>
-        <p className="text-gray-700 dark:text-gray-300 mb-4">
+      <div className="bg-bg-card p-6 rounded-lg shadow-xl max-w-md w-full">
+        <h2 className="text-xl font-semibold text-danger mb-4">Ein Fehler ist aufgetreten</h2>
+        <p className="text-text mb-4">
           Entschuldigung, es ist ein unerwartetes Problem aufgetreten. Bitte versuchen Sie es später erneut oder kontaktieren Sie den Support, falls das Problem weiterhin besteht.
         </p>
 
         <details className="mb-4" open={isDetailsOpen} onToggle={(e) => setIsDetailsOpen(e.currentTarget.open)}>
-          <summary className="cursor-pointer text-sm text-blue-600 dark:text-blue-400 hover:underline">
+          <summary className="cursor-pointer text-sm text-accent-text hover:underline">
             Technische Details anzeigen
           </summary>
-          <pre className="mt-2 p-3 bg-gray-100 dark:bg-gray-700 rounded text-xs text-gray-800 dark:text-gray-200 overflow-auto max-h-40">
+          <pre className="mt-2 p-3 bg-bg rounded text-xs text-text overflow-auto max-h-40">
             {technicalDetails.trim()}
           </pre>
           <button
             onClick={copyToClipboard}
-            className="mt-2 text-xs px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded disabled:opacity-50"
+            className="mt-2 text-xs px-3 py-1 bg-accent hover:opacity-90 text-white rounded disabled:opacity-50"
             disabled={!navigator.clipboard} // Disable if clipboard API not available
           >
             Details kopieren
@@ -60,7 +60,7 @@ ${error.stack || 'N/A'}
 
         <button
           onClick={onClose}
-          className="w-full px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-200 rounded hover:bg-gray-400 dark:hover:bg-gray-500"
+          className="w-full px-4 py-2 bg-row-hover text-text rounded hover:bg-border"
         >
           Schließen
         </button>
