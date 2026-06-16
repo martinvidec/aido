@@ -148,16 +148,16 @@ export default function ContactsPage() {
 
   return (
     <div className="container mx-auto p-4 md:p-8 max-w-4xl">
-      <Link href="/todos" className="mb-4 inline-block text-sm text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100">
+      <Link href="/todos" className="mb-4 inline-block text-sm text-text-dim hover:text-text">
         ← Zurück zu aido
       </Link>
-      <h1 className="text-3xl font-bold mb-8 text-gray-900 dark:text-gray-100">Kontakte und Anfragen</h1>
+      <h1 className="text-3xl font-bold mb-8 text-text">Kontakte und Anfragen</h1>
 
-      <section className="mb-12 p-6 bg-white dark:bg-gray-800 shadow-md rounded-lg">
-        <h2 className="text-2xl font-semibold mb-6 text-gray-800 dark:text-gray-200">Neue Kontaktanfrage senden</h2>
+      <section className="mb-12 p-6 bg-bg-card shadow-md rounded-lg">
+        <h2 className="text-2xl font-semibold mb-6 text-text">Neue Kontaktanfrage senden</h2>
         <form onSubmit={handleSendRequest} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label htmlFor="email" className="block text-sm font-medium text-text-dim mb-1">
               E-Mail-Adresse des Kontakts
             </label>
             <input
@@ -166,14 +166,14 @@ export default function ContactsPage() {
               value={targetEmail}
               onChange={(e) => setTargetEmail(e.target.value)}
               placeholder="name@example.com"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:bg-gray-700 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+              className="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent text-text bg-bg-card placeholder-text-dim"
               required
             />
           </div>
           <button
             type="submit"
             disabled={isLoadingSend}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-accent hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoadingSend ? (
               <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -186,43 +186,43 @@ export default function ContactsPage() {
           </button>
         </form>
         {message && (
-          <div className={`mt-4 p-3 rounded-md text-sm ${message.type === 'success' ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200' : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200'}`}>
+          <div className={`mt-4 p-3 rounded-md text-sm ${message.type === 'success' ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}`}>
             {message.text}
           </div>
         )}
       </section>
 
-      <section className="mb-12 p-6 bg-white dark:bg-gray-800 shadow-md rounded-lg">
+      <section className="mb-12 p-6 bg-bg-card shadow-md rounded-lg">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">Meine Kontakte ({contacts.length})</h2>
+          <h2 className="text-2xl font-semibold text-text">Meine Kontakte ({contacts.length})</h2>
         </div>
         {loadingContacts ? (
           <div className="flex justify-center items-center py-4">
-            <FaSpinner className="animate-spin text-2xl text-blue-500" />
-            <p className="ml-2 text-gray-600 dark:text-gray-400">Lade Kontakte...</p>
+            <FaSpinner className="animate-spin text-2xl text-accent" />
+            <p className="ml-2 text-text-dim">Lade Kontakte...</p>
           </div>
         ) : contacts.length === 0 ? (
-          <p className="text-gray-600 dark:text-gray-400 text-center py-4">Du hast noch keine Kontakte.</p>
+          <p className="text-text-dim text-center py-4">Du hast noch keine Kontakte.</p>
         ) : (
           <ul className="space-y-4">
             {contacts.map(contact => (
-              <li key={contact.uid} className="p-4 border border-gray-200 dark:border-gray-700 rounded-md flex items-center justify-between gap-3">
+              <li key={contact.uid} className="p-4 border border-border rounded-md flex items-center justify-between gap-3">
                 <div className="flex items-center flex-grow min-w-0">
                   {contact.photoURL ? (
                     <Image src={contact.photoURL} alt={contact.displayName || contact.email || 'Avatar'} width={40} height={40} className="rounded-full mr-4 flex-shrink-0" />
                   ) : (
-                    <div className="w-10 h-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center mr-4 flex-shrink-0 text-gray-500 dark:text-gray-400">
+                    <div className="w-10 h-10 rounded-full bg-row-hover flex items-center justify-center mr-4 flex-shrink-0 text-text-dim">
                       {(contact.displayName || contact.email || '?').charAt(0).toUpperCase()}
                     </div>
                   )}
                   <div className="min-w-0">
-                    <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                    <p className="font-medium text-text truncate">
                       {contact.displayName || 'N/A'}
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                    <p className="text-sm text-text-dim truncate">
                       {contact.email || 'Keine E-Mail'}
                     </p>
-                     <p className="text-xs text-gray-400 dark:text-gray-500">
+                     <p className="text-xs text-text-dim">
                       Kontakt seit: {new Date(contact.addedAt).toLocaleDateString()}
                     </p>
                   </div>
@@ -233,29 +233,29 @@ export default function ContactsPage() {
         )}
       </section>
 
-      <section className="mb-12 p-6 bg-white dark:bg-gray-800 shadow-md rounded-lg">
-        <h2 className="text-2xl font-semibold mb-6 text-gray-800 dark:text-gray-200">Eingehende Anfragen ({incomingRequests.length})</h2>
+      <section className="mb-12 p-6 bg-bg-card shadow-md rounded-lg">
+        <h2 className="text-2xl font-semibold mb-6 text-text">Eingehende Anfragen ({incomingRequests.length})</h2>
         {loadingIncoming ? (
-          <p className="text-gray-600 dark:text-gray-400">Lade eingehende Anfragen...</p>
+          <p className="text-text-dim">Lade eingehende Anfragen...</p>
         ) : incomingRequests.length === 0 ? (
-          <p className="text-gray-600 dark:text-gray-400">Keine eingehenden Anfragen gefunden.</p>
+          <p className="text-text-dim">Keine eingehenden Anfragen gefunden.</p>
         ) : (
           <ul className="space-y-4">
             {incomingRequests.map(req => (
-              <li key={req.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-md flex items-center justify-between gap-4 flex-wrap">
+              <li key={req.id} className="p-4 border border-border rounded-md flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center">
                   {req.requesterPhotoURL ? (
                     <Image src={req.requesterPhotoURL} alt={req.requesterDisplayName || req.requesterEmail || 'Avatar'} width={40} height={40} className="rounded-full mr-3" />
                   ) : (
-                    <div className="w-10 h-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center mr-3 text-gray-500 dark:text-gray-400">
+                    <div className="w-10 h-10 rounded-full bg-row-hover flex items-center justify-center mr-3 text-text-dim">
                       {(req.requesterDisplayName || req.requesterEmail || '?').charAt(0).toUpperCase()}
                     </div>
                   )}
                   <div>
-                    <p className="font-medium text-gray-900 dark:text-gray-100">
+                    <p className="font-medium text-text">
                       {req.requesterDisplayName || req.requesterEmail || req.id}
                     </p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                    <p className="text-xs text-text-dim">
                       Empfangen: {new Date(req.requestedAt).toLocaleDateString()} {new Date(req.requestedAt).toLocaleTimeString()}
                     </p>
                   </div>
@@ -264,14 +264,14 @@ export default function ContactsPage() {
                   <button 
                     onClick={() => handleAcceptRequest(req)}
                     disabled={actionLoading[req.id]}
-                    className="px-3 py-1 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 flex items-center"
+                    className="px-3 py-1 text-sm font-medium text-white bg-success hover:opacity-90 rounded-md focus:outline-none focus:ring-2 focus:ring-success disabled:opacity-50 flex items-center"
                   >
                     {actionLoading[req.id] ? <FaSpinner className="animate-spin mr-1" /> : <FaCheckCircle className="mr-1" />} Annahmen
                   </button>
                   <button 
                     onClick={() => handleRejectRequest(req.id)}
                     disabled={actionLoading[req.id]}
-                    className="px-3 py-1 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 flex items-center"
+                    className="px-3 py-1 text-sm font-medium text-white bg-danger hover:opacity-90 rounded-md focus:outline-none focus:ring-2 focus:ring-danger disabled:opacity-50 flex items-center"
                   >
                     {actionLoading[req.id] ? <FaSpinner className="animate-spin mr-1" /> : <FaTimesCircle className="mr-1" />} Ablehnen
                   </button>
@@ -282,45 +282,45 @@ export default function ContactsPage() {
         )}
       </section>
 
-      <section className="p-6 bg-white dark:bg-gray-800 shadow-md rounded-lg">
-        <h2 className="text-2xl font-semibold mb-6 text-gray-800 dark:text-gray-200">Ausgehende Anfragen ({outgoingRequests.length})</h2>
+      <section className="p-6 bg-bg-card shadow-md rounded-lg">
+        <h2 className="text-2xl font-semibold mb-6 text-text">Ausgehende Anfragen ({outgoingRequests.length})</h2>
         {loadingOutgoing ? (
-          <p className="text-gray-600 dark:text-gray-400">Lade ausgehende Anfragen...</p>
+          <p className="text-text-dim">Lade ausgehende Anfragen...</p>
         ) : outgoingRequests.length === 0 ? (
-          <p className="text-gray-600 dark:text-gray-400">Keine ausgehenden Anfragen gefunden.</p>
+          <p className="text-text-dim">Keine ausgehenden Anfragen gefunden.</p>
         ) : (
           <ul className="space-y-4">
             {outgoingRequests.map(req => (
-              <li key={req.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-md flex items-center justify-between gap-2 flex-wrap">
+              <li key={req.id} className="p-4 border border-border rounded-md flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center min-w-0">
                   {req.status === 'invited' ? (
-                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-500 flex items-center justify-center mr-3 text-gray-500 dark:text-gray-300 flex-shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-row-hover flex items-center justify-center mr-3 text-text-dim flex-shrink-0">
                       <FaEnvelope />
                     </div>
                   ) : req.targetUser?.photoURL ? (
                     <Image src={req.targetUser.photoURL} alt={req.targetUser.displayName || req.targetUser.email || 'Avatar'} width={40} height={40} className="rounded-full mr-3 flex-shrink-0" />
                   ) : (
-                    <div className="w-10 h-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center mr-3 text-gray-500 dark:text-gray-400 flex-shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-row-hover flex items-center justify-center mr-3 text-text-dim flex-shrink-0">
                       {((req.targetUser?.displayName || req.targetUser?.email) || '?').charAt(0).toUpperCase()}
                     </div>
                   )}
                   <div className="min-w-0">
-                    <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                    <p className="font-medium text-text truncate">
                       {req.status === 'invited' 
                         ? (req.targetEmail || 'E-Mail Einladung') 
                         : (req.targetUser?.displayName || req.targetUser?.email || req.id)}
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-text-dim">
                       Status: <span className={`font-semibold ${ 
-                        req.status === 'pending' ? 'text-yellow-600 dark:text-yellow-400' : 
-                        req.status === 'invited' ? 'text-blue-600 dark:text-blue-400' :
-                        req.status === 'accepted' ? 'text-green-600 dark:text-green-400' :
-                        req.status === 'rejected' ? 'text-red-600 dark:text-red-400' :
-                        'text-gray-600 dark:text-gray-300'}`}>
+                        req.status === 'pending' ? 'text-wait-text' :
+                        req.status === 'invited' ? 'text-mention' :
+                        req.status === 'accepted' ? 'text-success' :
+                        req.status === 'rejected' ? 'text-danger' :
+                        'text-text-dim'}`}>
                           {req.status === 'invited' ? 'Eingeladen' : req.status}
                         </span>
                     </p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                    <p className="text-xs text-text-dim">
                       {req.status === 'invited' ? 'Eingeladen am' : 'Gesendet am'}: {new Date(req.requestedAt).toLocaleDateString()} {new Date(req.requestedAt).toLocaleTimeString()}
                     </p>
                   </div>
@@ -330,7 +330,7 @@ export default function ContactsPage() {
                     <button 
                         onClick={() => handleCancelOutgoingRequest(req.id, req.status === 'invited')}
                         disabled={actionLoading[req.id]} 
-                        className="ml-auto px-3 py-1 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-400 disabled:opacity-50 flex items-center flex-shrink-0"
+                        className="ml-auto px-3 py-1 text-xs font-medium text-white bg-accent hover:opacity-90 rounded-md focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 flex items-center flex-shrink-0"
                     >
                         {actionLoading[req.id] ? <FaSpinner className="animate-spin mr-1" /> : null} 
                         Zurückziehen
