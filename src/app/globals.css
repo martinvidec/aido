@@ -5,10 +5,10 @@
 /* === Redesign design tokens (issue #39) ===========================
  * Source of truth: docs/design_handoff_aido_redesign/README.md → "Design Tokens".
  * Dark is the default (:root); light is an override on html[data-theme="light"].
- * `data-theme` is the single theme mechanism (issue #84): it drives these tokens,
- * Tailwind's `dark:` variants (darkMode keyed on [data-theme="dark"]), and the
- * legacy `:is([data-theme="dark"] .ProseMirror …)` overrides below. Tailwind
- * utilities map onto these vars in tailwind.config.ts.
+ * `data-theme` is the single theme mechanism (issues #84, #107): it drives these
+ * tokens and the `:is([data-theme="dark"] .ProseMirror …)` overrides below.
+ * Tailwind utilities map onto these vars in tailwind.config.ts; the `dark:`
+ * variant is no longer used anywhere (style with the token utilities instead).
  */
 :root {
   --bg: oklch(0.22 0.02 270);

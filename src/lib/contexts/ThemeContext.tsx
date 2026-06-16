@@ -20,10 +20,10 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 // applyTheme resolves the effective theme and applies it to <html> via the
-// single `data-theme="light|dark"` attribute (issue #84): it drives the redesign
-// oklch tokens (globals.css) AND Tailwind's `dark:` variants, which key off
-// [data-theme="dark"] (tailwind.config.ts) — so there is one theme mechanism and
-// the legacy UI can never disagree with the new UI about the active theme.
+// single `data-theme="light|dark"` attribute (issues #84, #107): it drives the
+// redesign oklch tokens (globals.css), which every screen now styles against —
+// so there is one theme mechanism and no legacy `.dark`/`dark:` path left to
+// disagree with it.
 const applyTheme = (theme: Theme, pathname: string): 'light' | 'dark' => {
   let effectiveTheme: 'light' | 'dark';
 
