@@ -44,7 +44,11 @@ export interface Todo {
   /** Author; immutable after creation. */
   createdBy: string;
   createdAt: Timestamp | null;
-  /** Manual sort order (board drag & drop / list ordering). */
+  /**
+   * Insertion order (`maxOrder + 1` at creation); drives the stable
+   * `orderBy("order","asc")` list/board sort. There is no manual reordering UI,
+   * so it is set once and not mutated afterwards.
+   */
   order: number;
 }
 

@@ -259,9 +259,6 @@ export const setTodoStatus = (
   status: { completed: boolean; waitingOn: string | null }
 ) => updateDoc(todoRef(spaceId, todoId), status);
 
-export const setTodoOrder = (spaceId: string, todoId: string, order: number) =>
-  updateDoc(todoRef(spaceId, todoId), { order });
-
 export const deleteTodo = (spaceId: string, todoId: string) =>
   deleteDoc(todoRef(spaceId, todoId));
 
