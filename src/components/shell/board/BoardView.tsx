@@ -5,7 +5,6 @@ import { useTodos } from "@/lib/contexts/TodosContext";
 import { useSpaces } from "@/lib/contexts/SpacesContext";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useSpaceMemberNames } from "@/lib/hooks/useMemberProfiles";
-import { spaceColorFromHue } from "@/lib/theme/colors";
 import Avatar from "../Avatar";
 import BoardGroupToggle from "./BoardGroupToggle";
 import TodoCard from "./TodoCard";
@@ -14,10 +13,9 @@ import { buildColumns, type BoardColumn, type GroupBy } from "./columns";
 /** Desktop Board view (issue #46): horizontal columns with HTML5 drag & drop. */
 export default function BoardView() {
   const { todos, loading, setWaitingOn, setStatus } = useTodos();
-  const { activeSpace } = useSpaces();
+  const { activeSpace, accent } = useSpaces();
   const { user } = useAuth();
   const nameOf = useSpaceMemberNames();
-  const accent = activeSpace ? spaceColorFromHue(activeSpace.color) : "var(--accent)";
 
   const [groupBy, setGroupBy] = useState<GroupBy>("person");
   const [dragId, setDragId] = useState<string | null>(null);

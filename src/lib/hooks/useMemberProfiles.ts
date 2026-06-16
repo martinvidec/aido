@@ -79,6 +79,21 @@ export function useMemberProfiles(memberUids: string[]): Record<string, PublicPr
   return profiles;
 }
 
+/** Fallback name for a member whose public profile hasn't resolved (yet). */
+export const UNKNOWN_MEMBER = "jemand";
+
+/**
+ * Resolves a member uid to a display name against a loaded profile map, falling
+ * back to {@link UNKNOWN_MEMBER}. Single source for the name + fallback shared by
+ * `useSpaceMemberNames` and the Heute `useMemberResolver` (issue #81).
+ */
+export function nameFromProfiles(
+  profiles: Record<string, PublicProfile>,
+  uid: string
+): string {
+  return profiles[uid]?.displayName ?? UNKNOWN_MEMBER;
+}
+
 /**
  * Returns a `nameOf(uid)` resolver for the active space's members (issue #45):
  * member display name, or "jemand" as a fallback.
@@ -86,5 +101,5 @@ export function useMemberProfiles(memberUids: string[]): Record<string, PublicPr
 export function useSpaceMemberNames(): (uid: string) => string {
   const { activeSpace } = useSpaces();
   const profiles = useMemberProfiles(activeSpace?.members ?? []);
-  return (uid: string) => profiles[uid]?.displayName ?? "jemand";
+  return (uid: string) => nameFromProfiles(profiles, uid);
 }

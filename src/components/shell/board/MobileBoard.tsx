@@ -5,7 +5,6 @@ import { useTodos } from "@/lib/contexts/TodosContext";
 import { useSpaces } from "@/lib/contexts/SpacesContext";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useSpaceMemberNames } from "@/lib/hooks/useMemberProfiles";
-import { spaceColorFromHue } from "@/lib/theme/colors";
 import Avatar from "../Avatar";
 import BottomSheet from "../BottomSheet";
 import BoardGroupToggle from "./BoardGroupToggle";
@@ -19,10 +18,9 @@ import type { Todo } from "@/lib/types";
  */
 export default function MobileBoard() {
   const { todos, loading, setWaitingOn, setStatus } = useTodos();
-  const { activeSpace } = useSpaces();
+  const { activeSpace, accent } = useSpaces();
   const { user } = useAuth();
   const nameOf = useSpaceMemberNames();
-  const accent = activeSpace ? spaceColorFromHue(activeSpace.color) : "var(--accent)";
 
   const [groupBy, setGroupBy] = useState<GroupBy>("person");
   const [moveCard, setMoveCard] = useState<Todo | null>(null);

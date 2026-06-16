@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { useTodos } from "@/lib/contexts/TodosContext";
 import { useSpaces } from "@/lib/contexts/SpacesContext";
-import { spaceColorFromHue } from "@/lib/theme/colors";
+import { useOutsideClick } from "@/lib/hooks/useOutsideClick";
 import TodoTitle from "./TodoTitle";
 import TodoBody from "./TodoBody";
 import TodoEditor from "./TodoEditor";
@@ -21,8 +21,7 @@ interface TodoRowProps {
 
 export default function TodoRow({ todo, nameOf, variant = "desktop", onOpenActions }: TodoRowProps) {
   const { setCompleted, editContent } = useTodos();
-  const { activeSpace } = useSpaces();
-  const accent = activeSpace ? spaceColorFromHue(activeSpace.color) : "var(--accent)";
+  const { accent } = useSpaces();
 
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -32,14 +31,7 @@ export default function TodoRow({ todo, nameOf, variant = "desktop", onOpenActio
   const hasBody = !!todo.body && Array.isArray((todo.body as any).content) && (todo.body as any).content.length > 0;
   const progress = hasBody ? checklistProgress(todo.body) : { done: 0, total: 0 };
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [menuOpen]);
+  useOutsideClick(menuRef, menuOpen, () => setMenuOpen(false));
 
   if (editing) {
     return (

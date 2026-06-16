@@ -3,14 +3,13 @@
 import React from "react";
 import { useSpaces } from "@/lib/contexts/SpacesContext";
 import { useMemberProfiles } from "@/lib/hooks/useMemberProfiles";
-import { spaceColorFromHue } from "@/lib/theme/colors";
 import Avatar from "./Avatar";
 import SegmentedControl from "./SegmentedControl";
 import InvitePopover from "./InvitePopover";
 import SpaceMenu from "./SpaceMenu";
 
 export default function SpaceHeader() {
-  const { activeSpace } = useSpaces();
+  const { activeSpace, accent } = useSpaces();
   const members = activeSpace?.members ?? [];
   const profiles = useMemberProfiles(members);
 
@@ -24,7 +23,7 @@ export default function SpaceHeader() {
           width: 14,
           height: 14,
           borderRadius: 5,
-          backgroundColor: spaceColorFromHue(activeSpace.color),
+          backgroundColor: accent,
         }}
       />
       <h1 className="text-2xl font-black">{activeSpace.name}</h1>

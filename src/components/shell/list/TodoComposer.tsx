@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { useTodos } from "@/lib/contexts/TodosContext";
 import { useSpaces } from "@/lib/contexts/SpacesContext";
-import { spaceColorFromHue } from "@/lib/theme/colors";
 import TodoEditor from "./TodoEditor";
 
 /**
@@ -12,10 +11,9 @@ import TodoEditor from "./TodoEditor";
  */
 export default function TodoComposer() {
   const { createTodo } = useTodos();
-  const { activeSpace } = useSpaces();
+  const { accent } = useSpaces();
   const [open, setOpen] = useState(false);
   const [quick, setQuick] = useState("");
-  const accent = activeSpace ? spaceColorFromHue(activeSpace.color) : "var(--accent)";
 
   const quickAdd = async () => {
     const value = quick.trim();

@@ -1,7 +1,7 @@
 "use client";
 
 import { useSpaces } from "@/lib/contexts/SpacesContext";
-import { useMemberProfiles } from "@/lib/hooks/useMemberProfiles";
+import { useMemberProfiles, nameFromProfiles } from "@/lib/hooks/useMemberProfiles";
 import {
   extractMentionTokens,
   resolveMentionToken,
@@ -26,7 +26,7 @@ export function useMemberResolver(): MemberResolver {
   const members = activeSpace?.members ?? [];
   const profiles = useMemberProfiles(members);
 
-  const nameOf = (uid: string) => profiles[uid]?.displayName ?? "jemand";
+  const nameOf = (uid: string) => nameFromProfiles(profiles, uid);
   const firstName = (uid: string) => nameOf(uid).split(/\s+/)[0];
 
   // Resolve the first @mention in the text to exactly one member uid. Unicode-
