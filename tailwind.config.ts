@@ -43,7 +43,14 @@ const config: Config = {
           text: "var(--wait-text)",
           bg: "var(--wait-bg)",
         },
-        danger: "var(--danger)",
+        danger: {
+          DEFAULT: "var(--danger)",
+          soft: "var(--danger-soft)",
+        },
+        success: {
+          DEFAULT: "var(--success)",
+          soft: "var(--success-soft)",
+        },
         "nav-bg": "var(--nav-bg)",
       },
       fontFamily: {

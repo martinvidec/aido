@@ -139,21 +139,21 @@ export default function UserSettings() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 dark:border-blue-400"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
       </div>
     );
   }
 
   return (
     <div className="max-w-2xl mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">User Settings</h1>
+      <h1 className="text-2xl font-bold mb-6 text-text">User Settings</h1>
 
       <div className="space-y-6">
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Profile</h2>
+        <div className="bg-bg-card p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4 text-text">Profile</h2>
           <div className="space-y-4">
             <div className="flex items-center space-x-4">
-              <div className="relative w-20 h-20 rounded-full overflow-hidden border dark:border-gray-700">
+              <div className="relative w-20 h-20 rounded-full overflow-hidden border border-border">
                 {settings.photoURL ? (
                   <Image
                     src={settings.photoURL}
@@ -164,8 +164,8 @@ export default function UserSettings() {
                     priority
                   />
                 ) : (
-                  <div className="w-full h-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
-                    <span className="text-2xl text-gray-500 dark:text-gray-300">
+                  <div className="w-full h-full bg-row-hover flex items-center justify-center">
+                    <span className="text-2xl text-text-dim">
                       {settings.displayName?.[0]?.toUpperCase() || '?'}
                     </span>
                   </div>
@@ -179,7 +179,7 @@ export default function UserSettings() {
                   value={settings.displayName}
                   onChange={(e) => setSettings({ ...settings, displayName: e.target.value })}
                   placeholder="Display Name"
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
+                  className="w-full p-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent text-text bg-bg-card"
                 />
               </div>
             </div>
@@ -191,17 +191,17 @@ export default function UserSettings() {
                 value={settings.email}
                 onChange={(e) => setSettings({ ...settings, email: e.target.value })}
                 placeholder="Email"
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
+                className="w-full p-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent text-text bg-bg-card"
               />
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Preferences</h2>
+        <div className="bg-bg-card p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4 text-text">Preferences</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-text-dim mb-2">
                 Theme
               </label>
               <div className="flex items-center space-x-4">
@@ -213,9 +213,9 @@ export default function UserSettings() {
                       value={mode}
                       checked={theme === mode}
                       onChange={() => handleThemeChange(mode)}
-                      className="form-radio h-4 w-4 text-blue-600 transition duration-150 ease-in-out focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                      className="form-radio h-4 w-4 text-accent transition duration-150 ease-in-out focus:ring-accent bg-bg-card border-border"
                     />
-                    <span className="text-sm text-gray-700 dark:text-gray-300 capitalize">
+                    <span className="text-sm text-text-dim capitalize">
                       {mode}
                     </span>
                   </label>
@@ -224,14 +224,14 @@ export default function UserSettings() {
             </div>
 
             <div>
-              <label htmlFor="language" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="language" className="block text-sm font-medium text-text-dim mb-2">
                 Language
               </label>
               <select
                 id="language"
                 value={settings.language}
                 onChange={(e) => setSettings({ ...settings, language: e.target.value })}
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
+                className="w-full p-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent text-text bg-bg-card"
               >
                 <option value="en">English</option>
                 <option value="de">German</option>
@@ -241,14 +241,14 @@ export default function UserSettings() {
             </div>
 
             <div>
-              <label htmlFor="timezone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="timezone" className="block text-sm font-medium text-text-dim mb-2">
                 Timezone
               </label>
               <select
                 id="timezone"
                 value={settings.timezone}
                 onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
+                className="w-full p-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent text-text bg-bg-card"
               >
                 {Intl.supportedValuesOf('timeZone').map((tz) => (
                   <option key={tz} value={tz}>
@@ -260,11 +260,11 @@ export default function UserSettings() {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Notifications</h2>
+        <div className="bg-bg-card p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4 text-text">Notifications</h2>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="text-sm font-medium text-text-dim">
                 Email Notifications
               </label>
               <input
@@ -274,11 +274,11 @@ export default function UserSettings() {
                   ...settings,
                   notifications: { ...settings.notifications, email: e.target.checked }
                 })}
-                className="form-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700"
+                className="form-checkbox h-4 w-4 text-accent focus:ring-accent border-border rounded bg-bg-card"
               />
             </div>
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="text-sm font-medium text-text-dim">
                 Push Notifications
               </label>
               <input
@@ -288,7 +288,7 @@ export default function UserSettings() {
                   ...settings,
                   notifications: { ...settings.notifications, push: e.target.checked }
                 })}
-                className="form-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700"
+                className="form-checkbox h-4 w-4 text-accent focus:ring-accent border-border rounded bg-bg-card"
               />
             </div>
           </div>
@@ -297,15 +297,15 @@ export default function UserSettings() {
         <ApiKeySettings />
 
         {error && (
-          <div className="bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded relative" role="alert">
+          <div className="bg-danger-soft border border-danger text-danger px-4 py-3 rounded relative" role="alert">
             <span className="block sm:inline">{error}</span>
           </div>
         )}
         {success && (
-          <div className="bg-green-100 dark:bg-green-900 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-200 px-4 py-3 rounded relative" role="alert">
+          <div className="bg-success-soft border border-success text-success px-4 py-3 rounded relative" role="alert">
             <span className="block sm:inline">{success}</span>
             <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={() => setSuccess('')}>
-              <svg className="fill-current h-6 w-6 text-green-500 dark:text-green-300" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+              <svg className="fill-current h-6 w-6 text-success" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
             </span>
           </div>
         )}
@@ -314,7 +314,7 @@ export default function UserSettings() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 disabled:opacity-50"
+            className="px-4 py-2 bg-accent text-white rounded-lg hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Save Settings'}
           </button>
