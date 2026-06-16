@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
+import { useOutsideClick } from "@/lib/hooks/useOutsideClick";
 import MemberManager from "./MemberManager";
 
 /**
@@ -10,15 +11,7 @@ import MemberManager from "./MemberManager";
 export default function InvitePopover() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
+  useOutsideClick(ref, open, () => setOpen(false));
 
   return (
     <div className="relative" ref={ref}>

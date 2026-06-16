@@ -4,30 +4,8 @@ import React from "react";
 import { useTodos } from "@/lib/contexts/TodosContext";
 import { checklistProgress } from "@/lib/utils/checklist";
 import Avatar from "../Avatar";
+import TokenizedText from "../TokenizedText";
 import type { Todo } from "@/lib/types";
-
-const TOKEN = /(@[\w]+|#[\w]+)/g;
-
-/** Non-interactive @mention/#tag highlight for board card titles. */
-function highlight(title: string) {
-  return title.split(TOKEN).map((part, i) => {
-    if (part.startsWith("@")) {
-      return (
-        <span key={i} className="rounded px-1" style={{ color: "var(--mention)", background: "var(--mention-bg)" }}>
-          {part}
-        </span>
-      );
-    }
-    if (part.startsWith("#")) {
-      return (
-        <span key={i} className="font-mono" style={{ color: "var(--tag)" }}>
-          {part}
-        </span>
-      );
-    }
-    return <span key={i}>{part}</span>;
-  });
-}
 
 interface TodoCardProps {
   todo: Todo;
@@ -67,7 +45,7 @@ export default function TodoCard({ todo, accent, nameOf, draggable, onDragStart,
           {todo.completed && <span className="text-white" style={{ fontSize: 11 }}>✓</span>}
         </button>
         <span className={`flex-1 text-sm font-bold ${todo.completed ? "line-through opacity-60" : ""}`}>
-          {highlight(todo.title)}
+          <TokenizedText text={todo.title} />
         </span>
       </div>
 

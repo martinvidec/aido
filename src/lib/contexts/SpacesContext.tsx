@@ -21,7 +21,7 @@ import {
   addSpaceMember,
   removeSpaceMember,
 } from "@/lib/firebase/firebaseUtils";
-import { SPACE_COLORS } from "@/lib/theme/colors";
+import { SPACE_COLORS, spaceColorFromHue } from "@/lib/theme/colors";
 import type { Space } from "@/lib/types";
 
 // Pick a palette hue for a new space, preferring one not already used by the
@@ -43,6 +43,8 @@ interface SpacesContextType {
   loading: boolean;
   activeSpaceId: string | null;
   activeSpace: Space | null;
+  /** Active space's accent color, or `var(--accent)` when none is selected. */
+  accent: string;
   /** Open-todo counts per spaceId (best-effort; absent until loaded). */
   openCounts: Record<string, number>;
   view: SpaceView;
@@ -239,12 +241,16 @@ export const SpacesProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const activeSpace = spaces.find((s) => s.id === activeSpaceId) ?? null;
+  // Single source for the redesign's accent color (issue #81): the active
+  // space's hue, or the neutral token when no space is selected.
+  const accent = activeSpace ? spaceColorFromHue(activeSpace.color) : "var(--accent)";
 
   const value: SpacesContextType = {
     spaces,
     loading,
     activeSpaceId,
     activeSpace,
+    accent,
     openCounts,
     view,
     setActiveSpace: setActiveSpaceId,
