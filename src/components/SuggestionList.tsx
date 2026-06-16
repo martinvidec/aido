@@ -58,30 +58,30 @@ const SuggestionList = forwardRef<SuggestionListRef, SuggestionListProps>((props
   }
 
   return (
-    <div className="bg-white dark:bg-gray-700 rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 overflow-hidden z-50 max-h-60 overflow-y-auto">
+    <div className="bg-bg-pop rounded-lg shadow-lg border border-border overflow-hidden z-50 max-h-60 overflow-y-auto">
       {props.items.map((item, index) => (
         <button
           key={item.id}
-          className={`flex items-center w-full text-left px-3 py-2 text-sm ${ 
-            index === selectedIndex 
-            ? 'bg-blue-100 dark:bg-blue-900' 
-            : 'hover:bg-gray-100 dark:hover:bg-gray-600'
+          className={`flex items-center w-full text-left px-3 py-2 text-sm ${
+            index === selectedIndex
+            ? 'bg-accent-soft'
+            : 'hover:bg-row-hover'
           }`}
           onClick={() => selectItem(index)}
         >
            {/* Optional Avatar */}
-           <div className="relative w-6 h-6 mr-2 rounded-full overflow-hidden border border-gray-300 dark:border-gray-500 flex-shrink-0">
+           <div className="relative w-6 h-6 mr-2 rounded-full overflow-hidden border border-border flex-shrink-0">
               {item.photoURL ? (
                   <Image src={item.photoURL} alt={item.label} fill className="object-cover" />
               ) : (
-                  <div className="w-full h-full bg-gray-200 dark:bg-gray-500 flex items-center justify-center">
-                     <span className="text-xs text-gray-500 dark:text-gray-200">
+                  <div className="w-full h-full bg-row-hover flex items-center justify-center">
+                     <span className="text-xs text-text-dim">
                         {item.label?.[0]?.toUpperCase() || '?'}
                      </span>
                   </div>
               )}
             </div>
-          <span className="text-gray-800 dark:text-gray-100 truncate">{item.label}</span>
+          <span className="text-text truncate">{item.label}</span>
         </button>
       ))}
     </div>
