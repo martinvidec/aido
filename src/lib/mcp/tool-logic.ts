@@ -1,6 +1,14 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { rateLimit } from "@/lib/apiKeys";
 import { getPrincipal } from "./context";
-import { McpToolError, listSpacesForUid, listTodos } from "./data";
+import {
+  McpToolError,
+  listSpacesForUid,
+  listTodos,
+  addTodo,
+  completeTodo,
+  setWaitingOn,
+} from "./data";
 
 // Firestore-backed MCP tool handlers (issue #119). Each handler resolves the
 // current request's user (from the AsyncLocalStorage principal), runs the
@@ -29,6 +37,16 @@ function requireUserUid(): string {
   return principal.uid;
 }
 
+// Lightweight per-uid write throttle (issue #120), reusing the fixed-window
+// limiter from apiKeys. Per serverless instance — a brake against scripted
+// spam, not a distributed quota.
+const WRITE_RATE_LIMIT = { max: 30, windowMs: 60_000 };
+function enforceWriteRateLimit(uid: string): void {
+  if (!rateLimit(`mcp:write:${uid}`, WRITE_RATE_LIMIT)) {
+    throw new McpToolError("rate_limited", "Too many writes; slow down and retry shortly.");
+  }
+}
+
 export async function handleListSpaces(): Promise<CallToolResult> {
   const uid = requireUserUid();
   return jsonResult(await listSpacesForUid(uid));
@@ -45,4 +63,40 @@ export async function handleListTodos(args: {
     tag: args.tag,
   });
   return jsonResult(todos);
+}
+
+export async function handleAddTodo(args: {
+  spaceId: string;
+  title: string;
+  bodyText?: string;
+  waitingOn?: string | null;
+}): Promise<CallToolResult> {
+  const uid = requireUserUid();
+  enforceWriteRateLimit(uid);
+  const todo = await addTodo(uid, args.spaceId, {
+    title: args.title,
+    bodyText: args.bodyText,
+    waitingOn: args.waitingOn,
+  });
+  return jsonResult(todo);
+}
+
+export async function handleCompleteTodo(args: {
+  spaceId: string;
+  todoId: string;
+  completed: boolean;
+}): Promise<CallToolResult> {
+  const uid = requireUserUid();
+  enforceWriteRateLimit(uid);
+  return jsonResult(await completeTodo(uid, args.spaceId, args.todoId, args.completed));
+}
+
+export async function handleSetWaitingOn(args: {
+  spaceId: string;
+  todoId: string;
+  userId: string | null;
+}): Promise<CallToolResult> {
+  const uid = requireUserUid();
+  enforceWriteRateLimit(uid);
+  return jsonResult(await setWaitingOn(uid, args.spaceId, args.todoId, args.userId));
 }

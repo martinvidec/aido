@@ -26,7 +26,23 @@ export const ListTodosRequestSchema = z.object({
     params: ListTodosParamsSchema.optional(),
 });
 
-// (add-todo and the other write tools are introduced with real schemas in #120.)
+// Write tools (issue #120): all space-scoped.
+export const AddTodoParamsSchema = MetaSchema.extend({
+    spaceId: z.string().min(1),
+    title: z.string().min(1),
+    bodyText: z.string().optional(),
+    waitingOn: z.string().nullable().optional(),
+});
+export const CompleteTodoParamsSchema = MetaSchema.extend({
+    spaceId: z.string().min(1),
+    todoId: z.string().min(1),
+    completed: z.boolean(),
+});
+export const SetWaitingOnParamsSchema = MetaSchema.extend({
+    spaceId: z.string().min(1),
+    todoId: z.string().min(1),
+    userId: z.string().nullable(),
+});
 
 // Schemas for tools/list
 export const ToolsListParamsSchema = MetaSchema.extend({});
