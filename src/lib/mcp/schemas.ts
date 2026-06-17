@@ -52,6 +52,16 @@ export const AddDailyParamsSchema = MetaSchema.extend({
     text: z.string().min(1),
 });
 
+// Comfort tools (issue #123).
+export const DeleteTodoParamsSchema = MetaSchema.extend({
+    spaceId: z.string().min(1),
+    todoId: z.string().min(1),
+});
+export const WhoamiParamsSchema = MetaSchema.extend({});
+export const ListMembersParamsSchema = MetaSchema.extend({
+    spaceId: z.string().min(1),
+});
+
 // Schemas for tools/list
 export const ToolsListParamsSchema = MetaSchema.extend({});
 export const ToolDefinitionSchema = z.object({
