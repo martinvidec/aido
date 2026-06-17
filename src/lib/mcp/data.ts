@@ -1,6 +1,7 @@
 import "server-only";
-import type { Firestore } from "firebase-admin/firestore";
+import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase/admin";
+import { deriveTags, deriveMentions, type MentionMember } from "@/lib/utils/textUtils";
 
 // Firestore-backed data access for the MCP tools (issue #118, epic #124).
 //
@@ -15,7 +16,12 @@ import { getAdminDb } from "@/lib/firebase/admin";
 
 // Error codes a tool helper can raise; the MCP tools/call dispatch maps these to
 // JSON-RPC errors / MCP error content.
-export type McpToolErrorCode = "unauthorized" | "not_found" | "invalid" | "unconfigured";
+export type McpToolErrorCode =
+  | "unauthorized"
+  | "not_found"
+  | "invalid"
+  | "unconfigured"
+  | "rate_limited";
 
 export class McpToolError extends Error {
   constructor(
@@ -127,8 +133,8 @@ export async function listSpacesForUid(uid: string): Promise<SpaceSummary[]> {
   return rows.sort((a, b) => a.createdAt - b.createdAt).map((r) => r.summary);
 }
 
-function mapTodoView(doc: FirebaseFirestore.QueryDocumentSnapshot): TodoView {
-  const d = doc.data();
+function mapTodoView(doc: FirebaseFirestore.DocumentSnapshot): TodoView {
+  const d = doc.data() ?? {};
   return {
     id: doc.id,
     title: typeof d.title === "string" ? d.title : "",
@@ -165,4 +171,106 @@ export async function listTodos(
     todos = todos.filter((t) => t.tags.some((x) => x.toLowerCase() === tag));
   }
   return todos;
+}
+
+// --- Writes (member-gated; mirror firestore.rules since the Admin SDK bypasses them) ---
+
+// Loads space members' public display names so plain-text @mentions in a title
+// can be resolved to uids (issue #76 parity), exactly like the web client.
+async function loadMentionMembers(db: Firestore, memberUids: string[]): Promise<MentionMember[]> {
+  if (memberUids.length === 0) return [];
+  const refs = memberUids.map((uid) => db.collection("publicProfiles").doc(uid));
+  const snaps = await db.getAll(...refs);
+  return snaps.map((s) => ({
+    uid: s.id,
+    displayName: s.exists ? ((s.data()!.displayName as string | null) ?? null) : null,
+  }));
+}
+
+// Minimal Tiptap doc wrapping a plain-text body, so an MCP-created todo renders
+// in the web editor and its #tags/@mentions are picked up by the derivations.
+function bodyFromText(text: string | undefined | null): Record<string, unknown> | null {
+  const trimmed = (text ?? "").trim();
+  if (!trimmed) return null;
+  return {
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text: trimmed }] }],
+  };
+}
+
+export async function addTodo(
+  uid: string,
+  spaceId: string,
+  input: { title: string; bodyText?: string | null; waitingOn?: string | null }
+): Promise<TodoView> {
+  const space = await requireMember(uid, spaceId);
+  const title = (input.title ?? "").trim();
+  if (!title) throw new McpToolError("invalid", "title is required.");
+
+  const waitingOn = input.waitingOn ?? null;
+  if (waitingOn !== null && !space.members.includes(waitingOn)) {
+    throw new McpToolError("invalid", "waitingOn must be a member of the space.");
+  }
+
+  const db = requireDb();
+  const todosCol = db.collection("spaces").doc(spaceId).collection("todos");
+  const body = bodyFromText(input.bodyText);
+  const members = await loadMentionMembers(db, space.members);
+
+  const lastSnap = await todosCol.orderBy("order", "desc").limit(1).get();
+  const maxOrder = lastSnap.empty
+    ? 0
+    : typeof lastSnap.docs[0].data().order === "number"
+      ? (lastSnap.docs[0].data().order as number)
+      : 0;
+
+  const ref = await todosCol.add({
+    spaceId,
+    title,
+    body,
+    completed: false,
+    waitingOn,
+    tags: deriveTags(title, body),
+    mentions: deriveMentions(body, title, members),
+    createdBy: uid,
+    createdAt: FieldValue.serverTimestamp(),
+    order: maxOrder + 1,
+  });
+
+  return mapTodoView(await ref.get());
+}
+
+export async function completeTodo(
+  uid: string,
+  spaceId: string,
+  todoId: string,
+  completed: boolean
+): Promise<TodoView> {
+  await requireMember(uid, spaceId);
+  if (!todoId) throw new McpToolError("invalid", "todoId is required.");
+  const db = requireDb();
+  const ref = db.collection("spaces").doc(spaceId).collection("todos").doc(todoId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new McpToolError("not_found", `Todo ${todoId} not found.`);
+  await ref.update({ completed: !!completed });
+  return mapTodoView(await ref.get());
+}
+
+export async function setWaitingOn(
+  uid: string,
+  spaceId: string,
+  todoId: string,
+  userId: string | null
+): Promise<TodoView> {
+  const space = await requireMember(uid, spaceId);
+  if (!todoId) throw new McpToolError("invalid", "todoId is required.");
+  if (userId !== null && !space.members.includes(userId)) {
+    throw new McpToolError("invalid", "waitingOn must be a member of the space, or null.");
+  }
+  const db = requireDb();
+  const ref = db.collection("spaces").doc(spaceId).collection("todos").doc(todoId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new McpToolError("not_found", `Todo ${todoId} not found.`);
+  await ref.update({ waitingOn: userId });
+  return mapTodoView(await ref.get());
 }

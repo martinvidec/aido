@@ -15,13 +15,23 @@ import type { IncomingMessage, ServerResponse } from 'node:http'; // ServerRespo
 // Import Schemas
 import {
     ListTodosParamsSchema,
+    AddTodoParamsSchema,
+    CompleteTodoParamsSchema,
+    SetWaitingOnParamsSchema,
     ToolsListRequestSchema,
     type ToolDefinition, // For typing toolsArray
     ToolsCallRequestSchema
 } from '@/lib/mcp/schemas';
 
 // Import Tool Logic Handlers
-import { handleListSpaces, handleListTodos, errorResult } from '@/lib/mcp/tool-logic';
+import {
+    handleListSpaces,
+    handleListTodos,
+    handleAddTodo,
+    handleCompleteTodo,
+    handleSetWaitingOn,
+    errorResult,
+} from '@/lib/mcp/tool-logic';
 
 // Import Session Management functions
 import {
@@ -79,6 +89,46 @@ function createAndConfigureMcpServer(sessionId: string): McpServer {
                     required: ['spaceId'],
                 },
             },
+            {
+                name: 'add-todo',
+                description: 'Creates a todo in a space you are a member of.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        spaceId: { type: 'string', description: 'The space to add the todo to (see list-spaces).' },
+                        title: { type: 'string', description: 'Todo title (may contain #tags and @mentions).' },
+                        bodyText: { type: 'string', description: 'Optional longer body text.' },
+                        waitingOn: { type: 'string', description: 'Optional member uid this todo is waiting on.' },
+                    },
+                    required: ['spaceId', 'title'],
+                },
+            },
+            {
+                name: 'complete-todo',
+                description: 'Marks a todo complete or open again.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        spaceId: { type: 'string' },
+                        todoId: { type: 'string' },
+                        completed: { type: 'boolean', description: 'true = done, false = reopen.' },
+                    },
+                    required: ['spaceId', 'todoId', 'completed'],
+                },
+            },
+            {
+                name: 'set-waiting-on',
+                description: 'Sets (or clears) the member a todo is waiting on.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        spaceId: { type: 'string' },
+                        todoId: { type: 'string' },
+                        userId: { type: 'string', description: 'Member uid to wait on, or null to clear.' },
+                    },
+                    required: ['spaceId', 'todoId', 'userId'],
+                },
+            },
         ];
         const actualResultPayload = { tools: toolsArray };
         return { result: actualResultPayload }; 
@@ -99,6 +149,18 @@ function createAndConfigureMcpServer(sessionId: string): McpServer {
                 case 'list-todos': {
                     const params = ListTodosParamsSchema.parse(toolArgs);
                     return await handleListTodos(params);
+                }
+                case 'add-todo': {
+                    const params = AddTodoParamsSchema.parse(toolArgs);
+                    return await handleAddTodo(params);
+                }
+                case 'complete-todo': {
+                    const params = CompleteTodoParamsSchema.parse(toolArgs);
+                    return await handleCompleteTodo(params);
+                }
+                case 'set-waiting-on': {
+                    const params = SetWaitingOnParamsSchema.parse(toolArgs);
+                    return await handleSetWaitingOn(params);
                 }
                 default:
                     return errorResult(`Tool '${toolName}' not found.`);
