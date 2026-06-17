@@ -297,6 +297,43 @@ export async function setWaitingOn(
   return mapTodoView(await ref.get());
 }
 
+export async function deleteTodo(
+  uid: string,
+  spaceId: string,
+  todoId: string
+): Promise<{ id: string; deleted: boolean }> {
+  await requireMember(uid, spaceId);
+  if (!todoId) throw new McpToolError("invalid", "todoId is required.");
+  const db = requireDb();
+  const ref = db.collection("spaces").doc(spaceId).collection("todos").doc(todoId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new McpToolError("not_found", `Todo ${todoId} not found.`);
+  await ref.delete();
+  return { id: todoId, deleted: true };
+}
+
+// --- Identity / members (issue #123) ---
+
+export interface MemberView {
+  uid: string;
+  displayName: string | null;
+}
+
+// The key owner's identity: uid + public display name.
+export async function whoami(uid: string): Promise<MemberView> {
+  if (!uid) throw new McpToolError("invalid", "Missing user.");
+  const db = requireDb();
+  const snap = await db.collection("publicProfiles").doc(uid).get();
+  return { uid, displayName: snap.exists ? ((snap.data()!.displayName as string | null) ?? null) : null };
+}
+
+// The members of a space (member-gated), with public display names — so a client
+// can resolve uids for set-waiting-on / add-todo waitingOn.
+export async function listMembers(uid: string, spaceId: string): Promise<MemberView[]> {
+  const space = await requireMember(uid, spaceId);
+  return loadMentionMembers(requireDb(), space.members);
+}
+
 // --- Daily "Heute" items (issue #121) ---
 
 function mapDailyView(doc: FirebaseFirestore.DocumentSnapshot): DailyView {

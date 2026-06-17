@@ -29,7 +29,7 @@ const db = getFirestore(adminApp);
 
 // Import the real tool code AFTER the app exists (functions only touch Firestore
 // when called, so import order vs. init is safe, but keep it explicit).
-const { requireMember, listSpacesForUid, listTodos, addTodo, completeTodo, setWaitingOn, listDaily, addDaily, McpToolError } =
+const { requireMember, listSpacesForUid, listTodos, addTodo, completeTodo, setWaitingOn, listDaily, addDaily, deleteTodo, whoami, listMembers, McpToolError } =
   await import("../src/lib/mcp/data.ts");
 const { handleListSpaces } = await import("../src/lib/mcp/tool-logic.ts");
 const { runWithPrincipal } = await import("../src/lib/mcp/context.ts");
@@ -127,6 +127,23 @@ async function run() {
   check("list-daily returns the day's items", listed.some((x) => x.id === daily.id));
   await expectError("list-daily rejects a bad date", "invalid", () => listDaily(ALICE, S1, "2026-13-40"));
   await expectError("add-daily rejects non-members", "unauthorized", () => addDaily(CAROL, S1, "x"));
+
+  // --- comfort tools: delete-todo, whoami, list-members ---
+  const toDelete = await addTodo(ALICE, S1, { title: "Delete me" });
+  await expectError("delete-todo rejects non-members", "unauthorized", () => deleteTodo(CAROL, S1, toDelete.id));
+  const del = await deleteTodo(ALICE, S1, toDelete.id);
+  check("delete-todo reports deleted", del.deleted === true && del.id === toDelete.id);
+  const goneSnap = await db.collection("spaces").doc(S1).collection("todos").doc(toDelete.id).get();
+  check("delete-todo actually removes the doc", !goneSnap.exists);
+  await expectError("delete-todo on a missing todo → not_found", "not_found", () => deleteTodo(ALICE, S1, "nope"));
+
+  const me = await whoami(ALICE);
+  check("whoami returns uid + display name", me.uid === ALICE && me.displayName === "Alice");
+
+  const members = await listMembers(ALICE, S1);
+  check("list-members returns the space members with names",
+    members.length === 2 && members.some((m) => m.uid === BOB && m.displayName === "Bob"));
+  await expectError("list-members rejects non-members", "unauthorized", () => listMembers(CAROL, S1));
 
   // --- principal gate (tool-logic): data tools require a user principal ---
   await expectError("no principal → unauthorized", "unauthorized", () => handleListSpaces());

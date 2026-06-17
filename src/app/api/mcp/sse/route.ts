@@ -20,6 +20,8 @@ import {
     SetWaitingOnParamsSchema,
     ListDailyParamsSchema,
     AddDailyParamsSchema,
+    DeleteTodoParamsSchema,
+    ListMembersParamsSchema,
     ToolsListRequestSchema,
     type ToolDefinition, // For typing toolsArray
     ToolsCallRequestSchema
@@ -34,6 +36,9 @@ import {
     handleSetWaitingOn,
     handleListDaily,
     handleAddDaily,
+    handleDeleteTodo,
+    handleWhoami,
+    handleListMembers,
     errorResult,
 } from '@/lib/mcp/tool-logic';
 
@@ -157,6 +162,32 @@ function createAndConfigureMcpServer(sessionId: string): McpServer {
                     required: ['spaceId', 'text'],
                 },
             },
+            {
+                name: 'delete-todo',
+                description: 'Deletes a todo from a space you are a member of.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        spaceId: { type: 'string' },
+                        todoId: { type: 'string' },
+                    },
+                    required: ['spaceId', 'todoId'],
+                },
+            },
+            {
+                name: 'whoami',
+                description: 'Returns the uid and display name of the personal API key owner.',
+                inputSchema: { type: 'object', properties: {} },
+            },
+            {
+                name: 'list-members',
+                description: 'Lists the members (uid + display name) of a space you belong to.',
+                inputSchema: {
+                    type: 'object',
+                    properties: { spaceId: { type: 'string' } },
+                    required: ['spaceId'],
+                },
+            },
         ];
         const actualResultPayload = { tools: toolsArray };
         return { result: actualResultPayload }; 
@@ -197,6 +228,16 @@ function createAndConfigureMcpServer(sessionId: string): McpServer {
                 case 'add-daily': {
                     const params = AddDailyParamsSchema.parse(toolArgs);
                     return await handleAddDaily(params);
+                }
+                case 'delete-todo': {
+                    const params = DeleteTodoParamsSchema.parse(toolArgs);
+                    return await handleDeleteTodo(params);
+                }
+                case 'whoami':
+                    return await handleWhoami();
+                case 'list-members': {
+                    const params = ListMembersParamsSchema.parse(toolArgs);
+                    return await handleListMembers(params);
                 }
                 default:
                     return errorResult(`Tool '${toolName}' not found.`);

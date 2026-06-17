@@ -10,6 +10,9 @@ import {
   setWaitingOn,
   listDaily,
   addDaily,
+  deleteTodo,
+  whoami,
+  listMembers,
 } from "./data";
 
 // Firestore-backed MCP tool handlers (issue #119). Each handler resolves the
@@ -118,4 +121,23 @@ export async function handleAddDaily(args: {
   const uid = requireUserUid();
   enforceWriteRateLimit(uid);
   return jsonResult(await addDaily(uid, args.spaceId, args.text));
+}
+
+export async function handleDeleteTodo(args: {
+  spaceId: string;
+  todoId: string;
+}): Promise<CallToolResult> {
+  const uid = requireUserUid();
+  enforceWriteRateLimit(uid);
+  return jsonResult(await deleteTodo(uid, args.spaceId, args.todoId));
+}
+
+export async function handleWhoami(): Promise<CallToolResult> {
+  const uid = requireUserUid();
+  return jsonResult(await whoami(uid));
+}
+
+export async function handleListMembers(args: { spaceId: string }): Promise<CallToolResult> {
+  const uid = requireUserUid();
+  return jsonResult(await listMembers(uid, args.spaceId));
 }
