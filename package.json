@@ -9,6 +9,7 @@
     "lint": "next lint",
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-rules-test \"node tests/firestore-rules.test.mjs && node tests/storage-rules.test.mjs\"",
     "test:migration": "firebase emulators:exec --only firestore --project demo-migration \"node tests/migration-admin.test.mjs\"",
+    "test:mcp": "firebase emulators:exec --only firestore --project demo-mcp \"node --conditions=react-server --import tsx tests/mcp-tools.test.mts\"",
     "migrate:legacy": "node scripts/migrate-legacy-todos-admin.mjs"
   },
   "dependencies": {
@@ -48,7 +49,8 @@
     "@firebase/rules-unit-testing": "^5.0.1",
     "@playwright/cli": "^0.1.13",
     "eslint": "8.57.0",
-    "eslint-config-next": "^15.5.19"
+    "eslint-config-next": "^15.5.19",
+    "tsx": "^4.22.4"
   },
   "overrides": {
     "next": {
