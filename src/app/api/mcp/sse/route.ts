@@ -18,6 +18,8 @@ import {
     AddTodoParamsSchema,
     CompleteTodoParamsSchema,
     SetWaitingOnParamsSchema,
+    ListDailyParamsSchema,
+    AddDailyParamsSchema,
     ToolsListRequestSchema,
     type ToolDefinition, // For typing toolsArray
     ToolsCallRequestSchema
@@ -30,6 +32,8 @@ import {
     handleAddTodo,
     handleCompleteTodo,
     handleSetWaitingOn,
+    handleListDaily,
+    handleAddDaily,
     errorResult,
 } from '@/lib/mcp/tool-logic';
 
@@ -129,6 +133,30 @@ function createAndConfigureMcpServer(sessionId: string): McpServer {
                     required: ['spaceId', 'todoId', 'userId'],
                 },
             },
+            {
+                name: 'list-daily',
+                description: 'Lists a space\'s short-lived "Heute" items for a date (default today).',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        spaceId: { type: 'string' },
+                        date: { type: 'string', description: 'YYYY-MM-DD; defaults to today (UTC).' },
+                    },
+                    required: ['spaceId'],
+                },
+            },
+            {
+                name: 'add-daily',
+                description: 'Adds a short-lived "Heute" item dated today.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        spaceId: { type: 'string' },
+                        text: { type: 'string', description: 'The item text.' },
+                    },
+                    required: ['spaceId', 'text'],
+                },
+            },
         ];
         const actualResultPayload = { tools: toolsArray };
         return { result: actualResultPayload }; 
@@ -161,6 +189,14 @@ function createAndConfigureMcpServer(sessionId: string): McpServer {
                 case 'set-waiting-on': {
                     const params = SetWaitingOnParamsSchema.parse(toolArgs);
                     return await handleSetWaitingOn(params);
+                }
+                case 'list-daily': {
+                    const params = ListDailyParamsSchema.parse(toolArgs);
+                    return await handleListDaily(params);
+                }
+                case 'add-daily': {
+                    const params = AddDailyParamsSchema.parse(toolArgs);
+                    return await handleAddDaily(params);
                 }
                 default:
                     return errorResult(`Tool '${toolName}' not found.`);

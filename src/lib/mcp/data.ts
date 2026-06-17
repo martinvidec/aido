@@ -58,6 +58,28 @@ export interface TodoView {
   order: number;
 }
 
+export interface DailyView {
+  id: string;
+  text: string;
+  completed: boolean;
+  date: string;
+  author: string;
+}
+
+// Strict YYYY-MM-DD, matching the daily `date` regex in firestore.rules.
+const DAILY_DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+// Today's date as YYYY-MM-DD in UTC. The web client uses the browser's local
+// date (firebaseUtils.todayString); server-side there is no user timezone, so
+// UTC is the deterministic choice (a daily added near midnight may land on the
+// caller's "yesterday/tomorrow" — acceptable for the tool).
+function todayUtc(): string {
+  const d = new Date();
+  const month = `${d.getUTCMonth() + 1}`.padStart(2, "0");
+  const day = `${d.getUTCDate()}`.padStart(2, "0");
+  return `${d.getUTCFullYear()}-${month}-${day}`;
+}
+
 // Admin Firestore handle, or a clear error when the service account is missing.
 // The feature degrades to a configuration error — never to something insecure.
 export function requireDb(): Firestore {
@@ -273,4 +295,57 @@ export async function setWaitingOn(
   if (!snap.exists) throw new McpToolError("not_found", `Todo ${todoId} not found.`);
   await ref.update({ waitingOn: userId });
   return mapTodoView(await ref.get());
+}
+
+// --- Daily "Heute" items (issue #121) ---
+
+function mapDailyView(doc: FirebaseFirestore.DocumentSnapshot): DailyView {
+  const d = doc.data() ?? {};
+  return {
+    id: doc.id,
+    text: typeof d.text === "string" ? d.text : "",
+    completed: d.completed === true,
+    date: typeof d.date === "string" ? d.date : "",
+    author: typeof d.author === "string" ? d.author : "",
+  };
+}
+
+// Lists a space's daily items for a date (default: today UTC), oldest-first.
+export async function listDaily(uid: string, spaceId: string, date?: string): Promise<DailyView[]> {
+  await requireMember(uid, spaceId);
+  const day = date ?? todayUtc();
+  if (!DAILY_DATE_RE.test(day)) {
+    throw new McpToolError("invalid", "date must be YYYY-MM-DD.");
+  }
+  const db = requireDb();
+  const snap = await db
+    .collection("spaces")
+    .doc(spaceId)
+    .collection("daily")
+    .where("date", "==", day)
+    .get();
+
+  return snap.docs
+    .map((d) => ({ createdAt: d.data().createdAt?.toMillis?.() ?? 0, view: mapDailyView(d) }))
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .map((r) => r.view);
+}
+
+// Adds a daily "Heute" item dated today (UTC). author=uid; mirrors the rules'
+// field shape (text/completed/spaceId/date).
+export async function addDaily(uid: string, spaceId: string, text: string): Promise<DailyView> {
+  await requireMember(uid, spaceId);
+  const trimmed = (text ?? "").trim();
+  if (!trimmed) throw new McpToolError("invalid", "text is required.");
+
+  const db = requireDb();
+  const ref = await db.collection("spaces").doc(spaceId).collection("daily").add({
+    spaceId,
+    text: trimmed,
+    completed: false,
+    date: todayUtc(),
+    author: uid,
+    createdAt: FieldValue.serverTimestamp(),
+  });
+  return mapDailyView(await ref.get());
 }

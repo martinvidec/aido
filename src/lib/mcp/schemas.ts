@@ -43,6 +43,14 @@ export const SetWaitingOnParamsSchema = MetaSchema.extend({
     todoId: z.string().min(1),
     userId: z.string().nullable(),
 });
+export const ListDailyParamsSchema = MetaSchema.extend({
+    spaceId: z.string().min(1),
+    date: z.string().optional(),
+});
+export const AddDailyParamsSchema = MetaSchema.extend({
+    spaceId: z.string().min(1),
+    text: z.string().min(1),
+});
 
 // Schemas for tools/list
 export const ToolsListParamsSchema = MetaSchema.extend({});
