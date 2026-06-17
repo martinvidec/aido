@@ -29,7 +29,7 @@ const db = getFirestore(adminApp);
 
 // Import the real tool code AFTER the app exists (functions only touch Firestore
 // when called, so import order vs. init is safe, but keep it explicit).
-const { requireMember, listSpacesForUid, listTodos, addTodo, completeTodo, setWaitingOn, McpToolError } =
+const { requireMember, listSpacesForUid, listTodos, addTodo, completeTodo, setWaitingOn, listDaily, addDaily, McpToolError } =
   await import("../src/lib/mcp/data.ts");
 const { handleListSpaces } = await import("../src/lib/mcp/tool-logic.ts");
 const { runWithPrincipal } = await import("../src/lib/mcp/context.ts");
@@ -115,6 +115,18 @@ async function run() {
   check("set-waiting-on clears to null", cleared.waitingOn === null);
   await expectError("set-waiting-on rejects a non-member", "invalid",
     () => setWaitingOn(ALICE, S1, created.id, CAROL));
+
+  // --- daily ("Heute") tools ---
+  const daily = await addDaily(ALICE, S1, "Quick note");
+  const dailySnap = await db.collection("spaces").doc(S1).collection("daily").doc(daily.id).get();
+  const dd = dailySnap.data()!;
+  check("add-daily sets author to the caller", dd.author === ALICE);
+  check("add-daily dates today (YYYY-MM-DD)", /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(dd.date));
+  check("add-daily starts not completed", dd.completed === false);
+  const listed = await listDaily(ALICE, S1, dd.date);
+  check("list-daily returns the day's items", listed.some((x) => x.id === daily.id));
+  await expectError("list-daily rejects a bad date", "invalid", () => listDaily(ALICE, S1, "2026-13-40"));
+  await expectError("add-daily rejects non-members", "unauthorized", () => addDaily(CAROL, S1, "x"));
 
   // --- principal gate (tool-logic): data tools require a user principal ---
   await expectError("no principal → unauthorized", "unauthorized", () => handleListSpaces());
