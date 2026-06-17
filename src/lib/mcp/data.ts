@@ -35,6 +35,23 @@ export interface SpaceData {
   createdBy: string;
 }
 
+export interface SpaceSummary {
+  id: string;
+  name: string;
+  color: number;
+  memberCount: number;
+  openTodoCount: number;
+}
+
+export interface TodoView {
+  id: string;
+  title: string;
+  completed: boolean;
+  waitingOn: string | null;
+  tags: string[];
+  order: number;
+}
+
 // Admin Firestore handle, or a clear error when the service account is missing.
 // The feature degrades to a configuration error — never to something insecure.
 export function requireDb(): Firestore {
@@ -78,4 +95,74 @@ export async function requireMember(uid: string, spaceId: string): Promise<Space
     members,
     createdBy: typeof data.createdBy === "string" ? data.createdBy : "",
   };
+}
+
+// Lists the spaces the uid is a member of, with member and open-todo counts.
+// array-contains + orderBy would need a composite index, so (like the client's
+// getSpacesForUser) it sorts oldest-first in memory. Open counts use Firestore
+// aggregate count() — no full todo scan.
+export async function listSpacesForUid(uid: string): Promise<SpaceSummary[]> {
+  if (!uid) throw new McpToolError("invalid", "Missing user.");
+  const db = requireDb();
+  const snap = await db.collection("spaces").where("members", "array-contains", uid).get();
+
+  const rows = await Promise.all(
+    snap.docs.map(async (doc) => {
+      const data = doc.data();
+      const members: string[] = Array.isArray(data.members) ? data.members : [];
+      const countSnap = await doc.ref.collection("todos").where("completed", "==", false).count().get();
+      return {
+        createdAt: data.createdAt?.toMillis?.() ?? 0,
+        summary: {
+          id: doc.id,
+          name: typeof data.name === "string" ? data.name : "",
+          color: typeof data.color === "number" ? data.color : 0,
+          memberCount: members.length,
+          openTodoCount: countSnap.data().count,
+        } as SpaceSummary,
+      };
+    })
+  );
+
+  return rows.sort((a, b) => a.createdAt - b.createdAt).map((r) => r.summary);
+}
+
+function mapTodoView(doc: FirebaseFirestore.QueryDocumentSnapshot): TodoView {
+  const d = doc.data();
+  return {
+    id: doc.id,
+    title: typeof d.title === "string" ? d.title : "",
+    completed: d.completed === true,
+    waitingOn: typeof d.waitingOn === "string" ? d.waitingOn : null,
+    tags: Array.isArray(d.tags) ? d.tags : [],
+    order: typeof d.order === "number" ? d.order : 0,
+  };
+}
+
+// Lists a space's todos (member-gated), sorted by `order` like the web list.
+// `includeCompleted` defaults to true; `tag` filters case-insensitively (with or
+// without a leading '#').
+export async function listTodos(
+  uid: string,
+  spaceId: string,
+  opts: { includeCompleted?: boolean; tag?: string } = {}
+): Promise<TodoView[]> {
+  await requireMember(uid, spaceId);
+  const db = requireDb();
+  const snap = await db
+    .collection("spaces")
+    .doc(spaceId)
+    .collection("todos")
+    .orderBy("order", "asc")
+    .get();
+
+  let todos = snap.docs.map(mapTodoView);
+  if (opts.includeCompleted === false) {
+    todos = todos.filter((t) => !t.completed);
+  }
+  if (opts.tag) {
+    const tag = opts.tag.replace(/^#/, "").toLowerCase();
+    todos = todos.filter((t) => t.tags.some((x) => x.toLowerCase() === tag));
+  }
+  return todos;
 }
