@@ -18,9 +18,17 @@ npx tsc --noEmit       # type-check (only stale .next/types errors are expected)
 npm run test:rules
 npx -y firebase-tools@13 emulators:exec --only firestore,storage --project demo-rules-test \
   "node tests/firestore-rules.test.mjs && node tests/storage-rules.test.mjs"
+
+# MCP tool tests (issue #122): exercise the real Admin-SDK tool code
+# (src/lib/mcp/data.ts + tool-logic.ts) against the Firestore emulator.
+npm run test:mcp
 ```
 
-There is no unit-test runner; the only automated tests are the emulator-based security-rules suites in `tests/` (plain `node` scripts using `@firebase/rules-unit-testing`, run a single one with `node tests/<file>.mjs` inside `emulators:exec`). `functions/` has its own `package.json` (`npm run build`/`lint` there).
+There is no general unit-test runner; the automated tests are emulator-based and live in `tests/`. Two flavours:
+- **Security-rules + migration suites** — plain `node` `.mjs` scripts using `@firebase/rules-unit-testing` (rules) or `firebase-admin` (migration), run inside `emulators:exec` (e.g. `node tests/<file>.mjs`).
+- **MCP tool tests** (`tests/mcp-tools.test.mts`, `npm run test:mcp`) — TypeScript run via `tsx`; they import the real `src/lib/mcp/*` code. The runner needs `node --conditions=react-server` (so the `server-only` guard resolves to an empty module) and pre-initializes the `admin`-named Firebase app so `admin.ts` reuses the emulator-bound app instead of going through `cert()`.
+
+`functions/` has its own `package.json` (`npm run build`/`lint` there).
 
 ## Architecture
 
