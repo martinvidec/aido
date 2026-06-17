@@ -14,15 +14,14 @@ import type { IncomingMessage, ServerResponse } from 'node:http'; // ServerRespo
 
 // Import Schemas
 import {
-    ListTodosParamsSchema, // Keep for z.infer
-    AddTodoParamsSchema, // Keep for z.infer
+    ListTodosParamsSchema,
     ToolsListRequestSchema,
     type ToolDefinition, // For typing toolsArray
     ToolsCallRequestSchema
 } from '@/lib/mcp/schemas';
 
 // Import Tool Logic Handlers
-import { handleListTodosLogic, handleAddTodoLogic } from '@/lib/mcp/tool-logic';
+import { handleListSpaces, handleListTodos, errorResult } from '@/lib/mcp/tool-logic';
 
 // Import Session Management functions
 import {
@@ -35,7 +34,10 @@ import {
 import { ManualMockServerResponse } from '@/lib/mcp/http-utils';
 
 // Import MCP endpoint auth guard
-import { requireMcpAuth } from '@/lib/mcp/auth';
+import { requireMcpAuth, authenticateMcp } from '@/lib/mcp/auth';
+// Per-request principal context (issue #119) + tool error type
+import { runWithPrincipal } from '@/lib/mcp/context';
+import { McpToolError } from '@/lib/mcp/data';
 
 // const activeTransports: Record<string, StreamableHTTPServerTransport> = {}; // Removed
 // const activeServers: Record<string, McpServer> = {}; // Removed
@@ -60,24 +62,22 @@ function createAndConfigureMcpServer(sessionId: string): McpServer {
         console.log(`[${sessionId}] Handling tools/list request:`, _request);
         const toolsArray: ToolDefinition[] = [
             {
-                name: 'list-todos',
-                description: 'Lists all todo items.',
+                name: 'list-spaces',
+                description: 'Lists the spaces you are a member of, with member and open-todo counts.',
                 inputSchema: { type: 'object', properties: {} },
-                outputSchema: {
-                    type: 'object',
-                    properties: {
-                        items: {
-                            type: 'array',
-                            items: { type: 'object' }
-                        }
-                    }
-                }
             },
             {
-                name: 'add-todo',
-                description: 'Adds a new todo item. Requires a "text" parameter.',
-                inputSchema: { type: 'object', properties: { 'text': { 'type': 'string', description: 'The text content of the todo.' } }, required: ['text'] },
-                outputSchema: { type: 'object' }
+                name: 'list-todos',
+                description: 'Lists todos in a space you are a member of.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        spaceId: { type: 'string', description: 'The space to list todos from (see list-spaces).' },
+                        includeCompleted: { type: 'boolean', description: 'Include completed todos (default true).' },
+                        tag: { type: 'string', description: 'Only todos carrying this #tag (case-insensitive).' },
+                    },
+                    required: ['spaceId'],
+                },
             },
         ];
         const actualResultPayload = { tools: toolsArray };
@@ -87,39 +87,34 @@ function createAndConfigureMcpServer(sessionId: string): McpServer {
     // --- tools/call Handler (centralized tool execution) ---
     mcpServer.setRequestHandler(ToolsCallRequestSchema, async (request: z.infer<typeof ToolsCallRequestSchema>) => {
         const toolName = request.params.name;
-        const toolArgs = request.params.arguments;
-        const metaArgs = request.params._meta;
+        const toolArgs = request.params.arguments ?? {};
 
-        console.log(`[${sessionId}] Handling tools/call for tool: ${toolName} with args:`, toolArgs, `and meta:`, metaArgs);
+        // Don't log args — they can contain user content. Tool name only.
+        console.log(`[${sessionId}] Handling tools/call for tool: ${toolName}`);
 
         try {
             switch (toolName) {
-                case 'list-todos':
-                    const listTodosParamsForLogic: z.infer<typeof ListTodosParamsSchema> = { _meta: metaArgs };
-                    ListTodosParamsSchema.parse(listTodosParamsForLogic); // Validate
-                    return await handleListTodosLogic(sessionId, listTodosParamsForLogic);
-                case 'add-todo':
-                    const addTodoParamsForLogic: z.infer<typeof AddTodoParamsSchema> = {
-                        ...(toolArgs || {}),
-                        _meta: metaArgs,
-                        text: toolArgs?.text as string, 
-                    } as z.infer<typeof AddTodoParamsSchema>; 
-                    if (toolArgs && typeof toolArgs.text === 'string') {
-                        addTodoParamsForLogic.text = toolArgs.text;
-                    } 
-                    AddTodoParamsSchema.parse(addTodoParamsForLogic); // Validate
-                    return await handleAddTodoLogic(sessionId, addTodoParamsForLogic);
+                case 'list-spaces':
+                    return await handleListSpaces();
+                case 'list-todos': {
+                    const params = ListTodosParamsSchema.parse(toolArgs);
+                    return await handleListTodos(params);
+                }
                 default:
-                    console.error(`[${sessionId}] Unknown tool called via tools/call: ${toolName}`);
-                    return { error: { code: ErrorCode.MethodNotFound, message: `Tool '${toolName}' not found.` } };
+                    return errorResult(`Tool '${toolName}' not found.`);
             }
         } catch (error) {
-            console.error(`[${sessionId}] Error during tools/call for ${toolName}:`, error);
-            let errorMessage = 'Internal server error during tool execution.';
-            if (error instanceof z.ZodError) {
-                errorMessage = `Invalid arguments for tool '${toolName}': ${error.issues.map(e => `${e.path.join('.')} - ${e.message}`).join(', ')}`;
+            // McpToolError carries the safe, user-facing code/message (membership,
+            // not_found, invalid, unconfigured). ZodError → invalid arguments.
+            if (error instanceof McpToolError) {
+                return errorResult(`${error.code}: ${error.message}`);
             }
-            return { error: { code: ErrorCode.InvalidParams, message: errorMessage } };
+            if (error instanceof z.ZodError) {
+                const msg = error.issues.map(e => `${e.path.join('.')} - ${e.message}`).join(', ');
+                return errorResult(`Invalid arguments for '${toolName}': ${msg}`);
+            }
+            console.error(`[${sessionId}] Error during tools/call for ${toolName}:`, error);
+            return errorResult('Internal error during tool execution.');
         }
     });
 
@@ -131,8 +126,9 @@ function createAndConfigureMcpServer(sessionId: string): McpServer {
 }
 
 export async function POST(req: NextRequest) {
-    const authError = await requireMcpAuth(req);
-    if (authError) return authError;
+    const auth = await authenticateMcp(req);
+    if (!auth.ok) return auth.response;
+    const principal = auth.principal;
 
     // Do not log full headers here — they contain the Authorization token.
     console.log("[General POST /api/mcp/sse] Incoming request, session ID:", req.headers.get('mcp-session-id'));
@@ -227,7 +223,10 @@ export async function POST(req: NextRequest) {
     try {
         console.log(`[${transport.sessionId || sessionId}] Calling transport.handleRequest with node-mocks-http req/res. Waiting for response to finish.`);
         
-        await new Promise<void>((resolve, reject) => {
+        // Run the transport (which invokes the tool handlers) inside the
+        // per-request principal scope (issue #119), so tools resolve the uid of
+        // THIS request's credential — never a uid bound to the cached session.
+        await runWithPrincipal(principal, () => new Promise<void>((resolve, reject) => {
             mockRes.on('finish', () => {
                 console.log(`[${sessionId}] mockRes 'finish' event fired.`);
                 resolve();
@@ -246,9 +245,9 @@ export async function POST(req: NextRequest) {
                     if (!mockRes.writableEnded) {
                         try { mockRes.end(); } catch (e) { console.error("Error ending mockRes after transport error:", e); }
                     }
-                    reject(err); 
+                    reject(err);
                 });
-        });
+        }));
 
         const responseData = mockRes._getData();
         console.log(`[POST - ${sessionId}] Raw mockRes._getData():`, responseData);

@@ -12,32 +12,21 @@ export const MetaSchema = z.object({
   }).optional()
 });
 
-// Schemas for list-todos
-export const ListTodosParamsSchema = MetaSchema.extend({});
+// Schemas for list-spaces (issue #119): no input params.
+export const ListSpacesParamsSchema = MetaSchema.extend({});
+
+// Schemas for list-todos (issue #119): scoped to one space; optional filters.
+export const ListTodosParamsSchema = MetaSchema.extend({
+    spaceId: z.string().min(1),
+    includeCompleted: z.boolean().optional(),
+    tag: z.string().optional(),
+});
 export const ListTodosRequestSchema = z.object({
     method: z.literal('list-todos'),
     params: ListTodosParamsSchema.optional(),
 });
-export const TodoSchema = z.object({
-    id: z.string(),
-    text: z.string(),
-    completed: z.boolean(),
-});
-export const ListTodosResultSchema = ResultSchema.extend({
-    result: z.object({ items: z.array(TodoSchema) }),
-});
 
-// Schemas for add-todo
-export const AddTodoParamsSchema = MetaSchema.extend({
-  text: z.string(),
-});
-export const AddTodoRequestSchema = z.object({
-    method: z.literal('add-todo'),
-    params: AddTodoParamsSchema,
-});
-export const AddTodoResultSchema = ResultSchema.extend({
-    result: TodoSchema,
-});
+// (add-todo and the other write tools are introduced with real schemas in #120.)
 
 // Schemas for tools/list
 export const ToolsListParamsSchema = MetaSchema.extend({});
