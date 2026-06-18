@@ -13,7 +13,7 @@ export function GET(req: Request) {
   return Response.json(
     {
       issuer: origin,
-      authorization_endpoint: `${origin}/api/oauth/authorize`,
+      authorization_endpoint: `${origin}/oauth/authorize`,
       token_endpoint: `${origin}/api/oauth/token`,
       registration_endpoint: `${origin}/api/oauth/register`,
       response_types_supported: ["code"],
