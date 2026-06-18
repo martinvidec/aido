@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
+import { getPublicOrigin } from "mcp-handler";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { API_KEYS_COLLECTION, hashApiKey, looksLikeApiKey } from "@/lib/apiKeys";
 
@@ -70,7 +71,20 @@ export async function authenticateMcp(req: NextRequest): Promise<McpAuthResult> 
     if (uid) return { ok: true, principal: { kind: "user", uid } };
   }
 
-  return { ok: false, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  // 401 with a WWW-Authenticate that points at the protected-resource metadata
+  // (issue #151), so an OAuth-capable client (claude.ai connector) can discover
+  // the Authorization Server. API-key/shared-token clients ignore the header.
+  const resourceMetadataUrl = `${getPublicOrigin(req)}/.well-known/oauth-protected-resource`;
+  return {
+    ok: false,
+    response: NextResponse.json(
+      { error: "Unauthorized" },
+      {
+        status: 401,
+        headers: { "WWW-Authenticate": `Bearer resource_metadata="${resourceMetadataUrl}"` },
+      }
+    ),
+  };
 }
 
 // Back-compat transport guard: returns null if authorized, else the error
