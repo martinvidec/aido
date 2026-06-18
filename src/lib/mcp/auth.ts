@@ -4,6 +4,8 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getPublicOrigin } from "mcp-handler";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { API_KEYS_COLLECTION, hashApiKey, looksLikeApiKey } from "@/lib/apiKeys";
+import { verifyAccessToken } from "@/lib/oauth/tokens";
+import { requestOrigin, resourceUrl } from "@/lib/oauth/config";
 
 // Guards the MCP endpoint. Two accepted credentials:
 // 1. the shared secret MCP_AUTH_TOKEN (ops/back-compat) — carries NO user
@@ -49,6 +51,22 @@ async function resolvePersonalApiKey(provided: string): Promise<string | null> {
   return doc.id; // doc id === uid
 }
 
+// Verifies an OAuth access token (issue #155): a JWT signed by aido's token
+// endpoint. iss/aud are derived from the request origin — identical to how the
+// token endpoint signed them (config.requestOrigin), so they line up. Non-JWTs
+// (shared secret / personal key, handled earlier) and any verification failure
+// return null.
+async function resolveOAuthToken(token: string, req: NextRequest): Promise<string | null> {
+  if (!token.includes(".")) return null;
+  const origin = requestOrigin(req);
+  try {
+    const { uid } = await verifyAccessToken(token, { issuer: origin, audience: resourceUrl(origin) });
+    return uid;
+  } catch {
+    return null;
+  }
+}
+
 // Authenticates an MCP request and returns the principal (issue #117). Data
 // tools branch on `principal.kind`: only `user` exposes a uid to scope to.
 export async function authenticateMcp(req: NextRequest): Promise<McpAuthResult> {
@@ -69,6 +87,10 @@ export async function authenticateMcp(req: NextRequest): Promise<McpAuthResult> 
     if (matchesSharedSecret(provided)) return { ok: true, principal: { kind: "shared" } };
     const uid = await resolvePersonalApiKey(provided);
     if (uid) return { ok: true, principal: { kind: "user", uid } };
+    // OAuth access token (issue #155): a JWT from aido's token endpoint — this is
+    // how the claude.ai web connector authenticates.
+    const oauthUid = await resolveOAuthToken(provided, req);
+    if (oauthUid) return { ok: true, principal: { kind: "user", uid: oauthUid } };
   }
 
   // 401 with a WWW-Authenticate that points at the protected-resource metadata
