@@ -170,6 +170,19 @@ async function run() {
   check("token: refresh → new access+refresh", refRes.status === 200 && !!ref.access_token && !!ref.refresh_token && ref.refresh_token !== tok.refresh_token);
   check("token: rotated (old refresh) → 400", (await tokenPost(tokenReq({ grant_type: "refresh_token", refresh_token: tok.refresh_token! }))).status === 400);
 
+  // --- MCP integration (issue #155): authenticateMcp accepts the OAuth JWT ---
+  const { authenticateMcp } = await import("../src/lib/mcp/auth.ts");
+  const mcpReq = (auth?: string) =>
+    new Request("https://aido.example/api/mcp/sse", {
+      method: "POST",
+      headers: auth ? { authorization: auth } : {},
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any;
+  const okAuth = await authenticateMcp(mcpReq(`Bearer ${tok.access_token}`));
+  check("MCP: valid OAuth JWT → {user, uid}", okAuth.ok === true && okAuth.principal?.kind === "user" && okAuth.principal?.uid === "tok-uid");
+  check("MCP: garbage bearer → 401", (await authenticateMcp(mcpReq("Bearer not.a.jwt"))).ok === false);
+  check("MCP: no auth → 401", (await authenticateMcp(mcpReq())).ok === false);
+
   // --- Refresh token: hashed, revocable ---
   const rt = await store.createRefreshToken({ uid: "u1", clientId: client.clientId, scope: "aido.tools" });
   check("refresh token is opaque (aidor_ prefix)", rt.startsWith("aidor_"));
