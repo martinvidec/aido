@@ -417,6 +417,20 @@ await check('owner may tag a legacy todo with migratedTo', assertSucceeds(
 await check('owner may set the migration flag on their user doc', assertSucceeds(
   setDoc(doc(db(ALICE), `users/${ALICE}`), { todosMigratedToSpacesAt: 1 }, { merge: true })));
 
+console.log('OAuth collections (admin-only, issue #150):');
+await check('user may not read oauthClients', assertFails(
+  getDoc(doc(db(ALICE), 'oauthClients/c1'))));
+await check('user may not write oauthClients', assertFails(
+  setDoc(doc(db(ALICE), 'oauthClients/c1'), { redirectUris: ['https://x'] })));
+await check('user may not read oauthCodes', assertFails(
+  getDoc(doc(db(ALICE), 'oauthCodes/code1'))));
+await check('user may not write oauthCodes', assertFails(
+  setDoc(doc(db(ALICE), 'oauthCodes/code1'), { uid: ALICE })));
+await check('user may not read oauthRefreshTokens', assertFails(
+  getDoc(doc(db(ALICE), 'oauthRefreshTokens/hash1'))));
+await check('user may not write oauthRefreshTokens', assertFails(
+  setDoc(doc(db(ALICE), 'oauthRefreshTokens/hash1'), { uid: ALICE })));
+
 await testEnv.cleanup();
 
 if (failures > 0) {

@@ -13,6 +13,7 @@
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-rules-test \"node tests/firestore-rules.test.mjs && node tests/storage-rules.test.mjs\"",
     "test:migration": "firebase emulators:exec --only firestore --project demo-migration \"node tests/migration-admin.test.mjs\"",
     "test:mcp": "firebase emulators:exec --only firestore --project demo-mcp \"node --conditions=react-server --import tsx tests/mcp-tools.test.mts\"",
+    "test:oauth": "firebase emulators:exec --only firestore --project demo-oauth \"node --conditions=react-server --import tsx tests/oauth.test.mts\"",
     "migrate:legacy": "node scripts/migrate-legacy-todos-admin.mjs"
   },
   "dependencies": {
