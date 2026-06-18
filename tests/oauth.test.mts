@@ -27,6 +27,15 @@ initializeApp({ projectId }, "admin");
 const { signAccessToken, verifyAccessToken } = await import("../src/lib/oauth/tokens.ts");
 const { verifyPkceS256 } = await import("../src/lib/oauth/pkce.ts");
 const store = await import("../src/lib/oauth/store.ts");
+const { POST: registerPost } = await import("../src/app/api/oauth/register/route.ts");
+
+function registerReq(bodyObj: unknown, ip = "1.2.3.4"): Request {
+  return new Request("https://aido.example/api/oauth/register", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-forwarded-for": ip },
+    body: JSON.stringify(bodyObj),
+  });
+}
 
 let failures = 0;
 function check(name: string, cond: boolean) {
@@ -84,6 +93,16 @@ async function run() {
   const c2 = await store.consumeAuthCode(code);
   check("auth code is single-use (replay → null)", c2 === null);
   check("unknown auth code → null", (await store.consumeAuthCode("nope")) === null);
+
+  // --- Dynamic Client Registration route (issue #152) ---
+  const okRes = await registerPost(registerReq({ redirect_uris: ["https://claude.ai/cb"], client_name: "Claude" }, "11.0.0.1"));
+  const okJson = (await okRes.json()) as { client_id?: string };
+  check("register → 201 + client_id", okRes.status === 201 && typeof okJson.client_id === "string");
+  const regClient = await store.getClient(okJson.client_id!);
+  check("register persisted the client", regClient?.redirectUris[0] === "https://claude.ai/cb" && regClient?.clientName === "Claude");
+  check("register empty redirect_uris → 400", (await registerPost(registerReq({ redirect_uris: [] }, "11.0.0.2"))).status === 400);
+  check("register invalid redirect_uri → 400", (await registerPost(registerReq({ redirect_uris: ["not-a-url"] }, "11.0.0.3"))).status === 400);
+  check("register fragment redirect_uri → 400", (await registerPost(registerReq({ redirect_uris: ["https://claude.ai/cb#x"] }, "11.0.0.4"))).status === 400);
 
   // --- Refresh token: hashed, revocable ---
   const rt = await store.createRefreshToken({ uid: "u1", clientId: client.clientId, scope: "aido.tools" });
