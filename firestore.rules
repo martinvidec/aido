@@ -39,6 +39,19 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // OAuth Authorization Server state (issue #150): registered clients, one-time
+    // authorization codes and hashed refresh tokens. Managed exclusively through
+    // the Admin SDK (src/lib/oauth) — no client access whatsoever.
+    match /oauthClients/{clientId} {
+      allow read, write: if false;
+    }
+    match /oauthCodes/{code} {
+      allow read, write: if false;
+    }
+    match /oauthRefreshTokens/{tokenHash} {
+      allow read, write: if false;
+    }
+
     // Spaces (issue #40): the organizing unit that replaces "My Todos / Shared
     // with me". Membership grants full access to everything in the space.
     // Rights model: any member may read and update (rename, recolor, add/remove
