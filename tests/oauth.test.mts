@@ -28,6 +28,26 @@ const { signAccessToken, verifyAccessToken } = await import("../src/lib/oauth/to
 const { verifyPkceS256 } = await import("../src/lib/oauth/pkce.ts");
 const store = await import("../src/lib/oauth/store.ts");
 const { POST: registerPost } = await import("../src/app/api/oauth/register/route.ts");
+const { POST: confirmPost } = await import("../src/app/api/oauth/authorize/confirm/route.ts");
+
+// Mint a real emulator Firebase ID token via the Auth emulator REST API
+// (accounts:signUp creates an anonymous user and returns an idToken).
+async function mintIdToken(): Promise<{ idToken: string; uid: string }> {
+  const host = process.env.FIREBASE_AUTH_EMULATOR_HOST;
+  const res = await fetch(
+    `http://${host}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake-key`,
+    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ returnSecureToken: true }) }
+  );
+  const data = (await res.json()) as { idToken: string; localId: string };
+  return { idToken: data.idToken, uid: data.localId };
+}
+function confirmReq(bodyObj: unknown): Request {
+  return new Request("https://aido.example/api/oauth/authorize/confirm", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(bodyObj),
+  });
+}
 
 function registerReq(bodyObj: unknown, ip = "1.2.3.4"): Request {
   return new Request("https://aido.example/api/oauth/register", {
@@ -103,6 +123,21 @@ async function run() {
   check("register empty redirect_uris → 400", (await registerPost(registerReq({ redirect_uris: [] }, "11.0.0.2"))).status === 400);
   check("register invalid redirect_uri → 400", (await registerPost(registerReq({ redirect_uris: ["not-a-url"] }, "11.0.0.3"))).status === 400);
   check("register fragment redirect_uri → 400", (await registerPost(registerReq({ redirect_uris: ["https://claude.ai/cb#x"] }, "11.0.0.4"))).status === 400);
+
+  // --- Authorize confirm route (issue #153): ID token → uid → auth code ---
+  const acClient = await store.createClient({ redirectUris: ["https://claude.ai/cb"], clientName: "Claude" });
+  const { idToken, uid } = await mintIdToken();
+  const cres = await confirmPost(confirmReq({
+    idToken, clientId: acClient.clientId, redirectUri: "https://claude.ai/cb", codeChallenge: challenge, state: "st-123", scope: "aido.tools",
+  }));
+  const cjson = (await cres.json()) as { redirectTo?: string };
+  check("confirm → 200 redirectTo with code+state", cres.status === 200 && /[?&]code=/.test(cjson.redirectTo ?? "") && /[?&]state=st-123/.test(cjson.redirectTo ?? ""));
+  const issuedCode = new URL(cjson.redirectTo!).searchParams.get("code");
+  const consumed = await store.consumeAuthCode(issuedCode!);
+  check("confirm code is bound to the real uid + challenge + client", consumed?.uid === uid && consumed?.codeChallenge === challenge && consumed?.clientId === acClient.clientId);
+  check("confirm invalid id token → 401", (await confirmPost(confirmReq({ idToken: "not-a-token", clientId: acClient.clientId, redirectUri: "https://claude.ai/cb", codeChallenge: challenge }))).status === 401);
+  check("confirm unregistered redirect_uri → 400", (await confirmPost(confirmReq({ idToken, clientId: acClient.clientId, redirectUri: "https://evil.example/cb", codeChallenge: challenge }))).status === 400);
+  check("confirm missing PKCE → 400", (await confirmPost(confirmReq({ idToken, clientId: acClient.clientId, redirectUri: "https://claude.ai/cb" }))).status === 400);
 
   // --- Refresh token: hashed, revocable ---
   const rt = await store.createRefreshToken({ uid: "u1", clientId: client.clientId, scope: "aido.tools" });
