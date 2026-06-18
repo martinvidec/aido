@@ -49,6 +49,15 @@ function confirmReq(bodyObj: unknown): Request {
   });
 }
 
+const { POST: tokenPost } = await import("../src/app/api/oauth/token/route.ts");
+function tokenReq(params: Record<string, string>): Request {
+  return new Request("https://aido.example/api/oauth/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": "22.0.0.1" },
+    body: new URLSearchParams(params).toString(),
+  });
+}
+
 function registerReq(bodyObj: unknown, ip = "1.2.3.4"): Request {
   return new Request("https://aido.example/api/oauth/register", {
     method: "POST",
@@ -138,6 +147,28 @@ async function run() {
   check("confirm invalid id token → 401", (await confirmPost(confirmReq({ idToken: "not-a-token", clientId: acClient.clientId, redirectUri: "https://claude.ai/cb", codeChallenge: challenge }))).status === 401);
   check("confirm unregistered redirect_uri → 400", (await confirmPost(confirmReq({ idToken, clientId: acClient.clientId, redirectUri: "https://evil.example/cb", codeChallenge: challenge }))).status === 400);
   check("confirm missing PKCE → 400", (await confirmPost(confirmReq({ idToken, clientId: acClient.clientId, redirectUri: "https://claude.ai/cb" }))).status === 400);
+
+  // --- Token endpoint (issue #154): code + PKCE → JWT + refresh; rotation ---
+  const tVerifier = randomBytes(32).toString("base64url");
+  const tChallenge = createHash("sha256").update(tVerifier).digest("base64url");
+  const tClient = await store.createClient({ redirectUris: ["https://claude.ai/cb"] });
+  const tCode = await store.createAuthCode({ uid: "tok-uid", clientId: tClient.clientId, redirectUri: "https://claude.ai/cb", codeChallenge: tChallenge, scope: "aido.tools" });
+
+  const tokRes = await tokenPost(tokenReq({ grant_type: "authorization_code", code: tCode, code_verifier: tVerifier, redirect_uri: "https://claude.ai/cb", client_id: tClient.clientId }));
+  const tok = (await tokRes.json()) as { access_token?: string; refresh_token?: string; token_type?: string; expires_in?: number };
+  check("token: code+PKCE → access+refresh", tokRes.status === 200 && !!tok.access_token && !!tok.refresh_token && tok.token_type === "Bearer" && tok.expires_in === 3600);
+  const verifiedTok = await verifyAccessToken(tok.access_token!, { issuer: "https://aido.example", audience: "https://aido.example/api/mcp/sse" });
+  check("token: JWT sub = uid", verifiedTok.uid === "tok-uid" && verifiedTok.clientId === tClient.clientId);
+  check("token: code replay → 400", (await tokenPost(tokenReq({ grant_type: "authorization_code", code: tCode, code_verifier: tVerifier, redirect_uri: "https://claude.ai/cb", client_id: tClient.clientId }))).status === 400);
+
+  const tCode2 = await store.createAuthCode({ uid: "tok-uid", clientId: tClient.clientId, redirectUri: "https://claude.ai/cb", codeChallenge: tChallenge, scope: "aido.tools" });
+  check("token: wrong code_verifier → 400", (await tokenPost(tokenReq({ grant_type: "authorization_code", code: tCode2, code_verifier: "wrong-verifier", redirect_uri: "https://claude.ai/cb", client_id: tClient.clientId }))).status === 400);
+  check("token: unsupported grant → 400", (await tokenPost(tokenReq({ grant_type: "password" }))).status === 400);
+
+  const refRes = await tokenPost(tokenReq({ grant_type: "refresh_token", refresh_token: tok.refresh_token! }));
+  const ref = (await refRes.json()) as { access_token?: string; refresh_token?: string };
+  check("token: refresh → new access+refresh", refRes.status === 200 && !!ref.access_token && !!ref.refresh_token && ref.refresh_token !== tok.refresh_token);
+  check("token: rotated (old refresh) → 400", (await tokenPost(tokenReq({ grant_type: "refresh_token", refresh_token: tok.refresh_token! }))).status === 400);
 
   // --- Refresh token: hashed, revocable ---
   const rt = await store.createRefreshToken({ uid: "u1", clientId: client.clientId, scope: "aido.tools" });

@@ -25,3 +25,17 @@ export const OAUTH = {
 export function resourceUrl(origin: string): string {
   return `${origin.replace(/\/$/, "")}/api/mcp/sse`;
 }
+
+/**
+ * Public origin of a request, honouring the Vercel proxy headers. Used by the
+ * token endpoint (to sign `iss`/`aud`) and the MCP token check (to verify them)
+ * so both compute the identical issuer/audience.
+ */
+export function requestOrigin(req: Request): string {
+  const url = new URL(req.url);
+  const host = (req.headers.get("x-forwarded-host") ?? url.host).split(",")[0].trim();
+  const proto = (req.headers.get("x-forwarded-proto") ?? url.protocol.replace(/:$/, ""))
+    .split(",")[0]
+    .trim();
+  return `${proto}://${host}`;
+}
