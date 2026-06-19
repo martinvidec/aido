@@ -205,6 +205,10 @@ async function run() {
   check("confirm unknown user_code → 400", (await confirmPost(confirmReq({ idToken, userCode: "ZZZZ-ZZZZ", action: "approve" }))).status === 400);
   check("confirm missing fields → 400", (await confirmPost(confirmReq({ idToken, action: "approve" }))).status === 400);
   check("confirm bad action → 400", (await confirmPost(confirmReq({ idToken, userCode: cerr.userCode, action: "frobnicate" }))).status === 400);
+  // Contract guard: the consent form must send the imperative action verbs. The
+  // past-tense forms (the original /device bug) are rejected — keep them in sync.
+  check("confirm rejects past-tense action 'approved' → 400", (await confirmPost(confirmReq({ idToken, userCode: cerr.userCode, action: "approved" }))).status === 400);
+  check("confirm accepts 'approve' (the form's value) → 200", (await confirmPost(confirmReq({ idToken, userCode: cerr.userCode, action: "approve" }))).status === 200);
 
   // --- poll endpoint (issue #181): RFC error codes, then custom token on approve ---
   const pf = await store.createDeviceLogin();
