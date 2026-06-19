@@ -23,8 +23,16 @@ initializeApp({ projectId }, "admin");
 
 const store = await import("../src/lib/auth/deviceLogin.ts");
 const { getAdminDb } = await import("../src/lib/firebase/admin.ts");
+const { POST: startPost } = await import("../src/app/api/auth/device/start/route.ts");
 
 const sha256 = (v: string) => createHash("sha256").update(v).digest("hex");
+
+function startReq(ip = "5.0.0.1"): Request {
+  return new Request("https://aido.example/api/auth/device/start", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-forwarded-for": ip, "x-forwarded-host": "aido.example", "x-forwarded-proto": "https" },
+  });
+}
 
 let failures = 0;
 function check(name: string, cond: boolean) {
@@ -91,6 +99,37 @@ async function run() {
     .doc(sha256(e2.deviceCode))
     .update({ expiresAt: Date.now() - 1000 });
   check("approve expired code → false", (await store.approveDeviceLogin(e2.userCode, "uid-e")) === false);
+
+  // --- start endpoint (issue #179): shape + verification URIs, then rate limit ---
+  const sRes = await startPost(startReq("5.0.0.1"));
+  const s = (await sRes.json()) as {
+    device_code?: string; user_code?: string;
+    verification_uri?: string; verification_uri_complete?: string;
+    expires_in?: number; interval?: number;
+  };
+  check(
+    "start → 200 with device_code + formatted user_code + ttl/interval",
+    sRes.status === 200 &&
+      typeof s.device_code === "string" && s.device_code!.length > 0 &&
+      /^[A-Z]{4}-[A-Z]{4}$/.test(s.user_code ?? "") &&
+      s.expires_in === store.DEVICE_LOGIN.ttlSec &&
+      s.interval === store.DEVICE_LOGIN.pollIntervalSec
+  );
+  check(
+    "start → verification_uri(_complete) honour the forwarded origin + user_code",
+    s.verification_uri === "https://aido.example/device" &&
+      s.verification_uri_complete === `https://aido.example/device?user_code=${encodeURIComponent(s.user_code!)}`
+  );
+  // the started code is real: poll it → pending
+  check("start → device_code is pollable (pending)", (await store.pollDeviceLogin(s.device_code!)).kind === "pending");
+
+  // rate limit: a fresh IP, 30 allowed then 429 (max 30 / window)
+  let limited = false;
+  for (let i = 0; i < 32; i++) {
+    const r = await startPost(startReq("5.9.9.9"));
+    if (r.status === 429) { limited = true; break; }
+  }
+  check("start → rate-limited after the per-IP cap", limited);
 }
 
 run()
