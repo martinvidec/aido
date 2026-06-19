@@ -18,7 +18,7 @@ export default function DeviceConsentForm({ initialUserCode }: { initialUserCode
   const [error, setError] = useState("");
   const [outcome, setOutcome] = useState<Outcome | null>(null);
 
-  async function decide(action: Outcome) {
+  async function decide(action: "approve" | "deny") {
     if (!user) return;
     const code = userCode.trim();
     if (!code) {
@@ -103,14 +103,14 @@ export default function DeviceConsentForm({ initialUserCode }: { initialUserCode
 
                 <div className="flex gap-2">
                   <button
-                    onClick={() => decide("approved")}
+                    onClick={() => decide("approve")}
                     disabled={busy}
                     className="flex-1 rounded-full bg-accent px-4 py-2.5 font-extrabold text-white disabled:opacity-50"
                   >
                     {busy ? "…" : "Erlauben"}
                   </button>
                   <button
-                    onClick={() => decide("denied")}
+                    onClick={() => decide("deny")}
                     disabled={busy}
                     className="flex-1 rounded-full border border-border px-4 py-2.5 font-semibold text-text-dim hover:text-text disabled:opacity-50"
                   >
