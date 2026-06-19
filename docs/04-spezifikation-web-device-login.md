@@ -136,6 +136,11 @@ await signInWithCustomToken(auth, firebaseCustomToken); // → Session → route
   `revokeRefreshTokens(uid)`. Minimierung: kurze `ttlSec`, Single-use, sofortiger
   Exchange. **DPoP ist für Firebase-Sessions nicht anwendbar** (anders als der
   MCP-Pfad #174).
+- **Revoke (#185):** Für den Notfall gibt es „Auf allen Geräten abmelden" in den
+  Settings → `POST /api/auth/sessions/revoke` (verifiziert das ID-Token → uid,
+  `getAdminAuth().revokeRefreshTokens(uid)`). ID-Tokens bleiben bis Ablauf (~1 h)
+  gültig (kein `checkRevoked` auf jedem Read); der Client meldet sich lokal sofort
+  ab. TTL (5 min) + Single-use + per-IP-Rate-Limit auf confirm runden die Härtung ab.
 
 ## 3. Implementierungsplan
 

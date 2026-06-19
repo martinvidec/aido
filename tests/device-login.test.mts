@@ -26,7 +26,17 @@ const { getAdminDb } = await import("../src/lib/firebase/admin.ts");
 const { POST: startPost } = await import("../src/app/api/auth/device/start/route.ts");
 const { POST: confirmPost } = await import("../src/app/api/auth/device/confirm/route.ts");
 const { POST: pollPost } = await import("../src/app/api/auth/device/poll/route.ts");
+const { POST: revokePost } = await import("../src/app/api/auth/sessions/revoke/route.ts");
 const { getAdminAuth } = await import("../src/lib/firebase/admin.ts");
+
+function revokeReq(bearer: string | null, ip = "10.0.0.1"): Request {
+  return new Request("https://aido.example/api/auth/sessions/revoke", {
+    method: "POST",
+    headers: bearer
+      ? { authorization: `Bearer ${bearer}`, "x-forwarded-for": ip }
+      : { "x-forwarded-for": ip },
+  });
+}
 
 const sha256 = (v: string) => createHash("sha256").update(v).digest("hex");
 
@@ -260,6 +270,13 @@ async function run() {
     const denied = (await (await pollPost(pollReq(s.device_code, "9.0.0.1"))).json()) as { error?: string };
     check("e2e(deny): poll after deny → access_denied", denied.error === "access_denied");
   }
+
+  // --- session revoke endpoint (issue #185) ---
+  const { idToken: revIdToken } = await mintIdToken();
+  const revOk = await revokePost(revokeReq(revIdToken));
+  check("revoke valid id token → 200 {revoked}", revOk.status === 200 && ((await revOk.json()) as { revoked?: boolean }).revoked === true);
+  check("revoke missing bearer → 401", (await revokePost(revokeReq(null))).status === 401);
+  check("revoke invalid id token → 401", (await revokePost(revokeReq("not-a-token"))).status === 401);
 }
 
 run()
