@@ -220,6 +220,46 @@ async function run() {
   const pd = await store.createDeviceLogin();
   await store.denyDeviceLogin(pd.userCode);
   check("poll denied → 400 access_denied", ((await (await pollPost(pollReq(pd.deviceCode))).json()) as { error?: string }).error === "access_denied");
+
+  // === issue #184: cohesive end-to-end, ONLY over the HTTP endpoints ===
+  // start → poll(pending) → poll(slow_down) → confirm(approve) → poll(custom
+  // token) → exchange→verify uid → poll(single-use → expired). No direct store
+  // calls — proves the endpoints compose as a black box.
+  {
+    const sRes = await startPost(startReq("8.0.0.1"));
+    const s = (await sRes.json()) as { device_code: string; user_code: string };
+    check("e2e: start → device_code + user_code", !!s.device_code && /^[A-Z]{4}-[A-Z]{4}$/.test(s.user_code));
+
+    const e1 = (await (await pollPost(pollReq(s.device_code, "8.0.0.1"))).json()) as { error?: string };
+    check("e2e: poll #1 → authorization_pending", e1.error === "authorization_pending");
+    const e2 = (await (await pollPost(pollReq(s.device_code, "8.0.0.1"))).json()) as { error?: string };
+    check("e2e: poll #2 (fast) → slow_down", e2.error === "slow_down");
+
+    const { idToken: e2eIdToken, uid: e2eUid } = await mintIdToken();
+    const cRes = await confirmPost(confirmReq({ idToken: e2eIdToken, userCode: s.user_code, action: "approve" }, "8.0.0.2"));
+    check("e2e: confirm(approve) on the trusted device → approved", cRes.status === 200 && ((await cRes.json()) as { status?: string }).status === "approved");
+
+    const tokRes = await pollPost(pollReq(s.device_code, "8.0.0.1"));
+    const tok = (await tokRes.json()) as { firebaseCustomToken?: string };
+    check("e2e: poll after approve → custom token", tokRes.status === 200 && !!tok.firebaseCustomToken);
+
+    const idToken = tok.firebaseCustomToken ? await exchangeCustomToken(tok.firebaseCustomToken) : null;
+    const signedInUid = idToken ? (await getAdminAuth()!.verifyIdToken(idToken)).uid : null;
+    check("e2e: custom token establishes a session as the approver", signedInUid === e2eUid);
+
+    const after = (await (await pollPost(pollReq(s.device_code, "8.0.0.1"))).json()) as { error?: string };
+    check("e2e: re-poll after sign-in → expired_token (single-use)", after.error === "expired_token");
+  }
+
+  // === issue #184: end-to-end deny, ONLY over the HTTP endpoints ===
+  {
+    const sRes = await startPost(startReq("9.0.0.1"));
+    const s = (await sRes.json()) as { device_code: string; user_code: string };
+    const { idToken: dIdToken } = await mintIdToken();
+    await confirmPost(confirmReq({ idToken: dIdToken, userCode: s.user_code, action: "deny" }, "9.0.0.2"));
+    const denied = (await (await pollPost(pollReq(s.device_code, "9.0.0.1"))).json()) as { error?: string };
+    check("e2e(deny): poll after deny → access_denied", denied.error === "access_denied");
+  }
 }
 
 run()
