@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import DeviceLoginPanel from './DeviceLoginPanel';
 
 export default function LoginPage() {
   const { user, signInWithGoogle, loading } = useAuth();
@@ -43,6 +44,14 @@ export default function LoginPage() {
       >
         Sign in with Google
       </button>
+
+      <div className="flex items-center gap-3 my-6 w-full max-w-xs text-text-dim">
+        <span className="h-px flex-1 bg-border" />
+        <span className="text-xs uppercase tracking-wide">oder</span>
+        <span className="h-px flex-1 bg-border" />
+      </div>
+
+      <DeviceLoginPanel />
     </div>
   );
 } 
