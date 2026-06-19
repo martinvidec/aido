@@ -25,8 +25,31 @@ const store = await import("../src/lib/auth/deviceLogin.ts");
 const { getAdminDb } = await import("../src/lib/firebase/admin.ts");
 const { POST: startPost } = await import("../src/app/api/auth/device/start/route.ts");
 const { POST: confirmPost } = await import("../src/app/api/auth/device/confirm/route.ts");
+const { POST: pollPost } = await import("../src/app/api/auth/device/poll/route.ts");
+const { getAdminAuth } = await import("../src/lib/firebase/admin.ts");
 
 const sha256 = (v: string) => createHash("sha256").update(v).digest("hex");
+
+function pollReq(deviceCode: unknown, ip = "7.0.0.1"): Request {
+  return new Request("https://aido.example/api/auth/device/poll", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-forwarded-for": ip },
+    body: JSON.stringify({ device_code: deviceCode }),
+  });
+}
+
+// Exchange a custom token for an ID token via the Auth emulator REST API,
+// proving the token actually establishes a session.
+async function exchangeCustomToken(customToken: string): Promise<string | null> {
+  const host = process.env.FIREBASE_AUTH_EMULATOR_HOST;
+  const res = await fetch(
+    `http://${host}/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=fake-key`,
+    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: customToken, returnSecureToken: true }) }
+  );
+  if (!res.ok) return null;
+  const data = (await res.json()) as { idToken?: string };
+  return data.idToken ?? null;
+}
 
 function startReq(ip = "5.0.0.1"): Request {
   return new Request("https://aido.example/api/auth/device/start", {
@@ -172,6 +195,31 @@ async function run() {
   check("confirm unknown user_code → 400", (await confirmPost(confirmReq({ idToken, userCode: "ZZZZ-ZZZZ", action: "approve" }))).status === 400);
   check("confirm missing fields → 400", (await confirmPost(confirmReq({ idToken, action: "approve" }))).status === 400);
   check("confirm bad action → 400", (await confirmPost(confirmReq({ idToken, userCode: cerr.userCode, action: "frobnicate" }))).status === 400);
+
+  // --- poll endpoint (issue #181): RFC error codes, then custom token on approve ---
+  const pf = await store.createDeviceLogin();
+  const pPending = await pollPost(pollReq(pf.deviceCode));
+  check("poll pending → 400 authorization_pending", pPending.status === 400 && ((await pPending.json()) as { error?: string }).error === "authorization_pending");
+  const pSlow = await pollPost(pollReq(pf.deviceCode));
+  check("poll too fast → 400 slow_down", pSlow.status === 400 && ((await pSlow.json()) as { error?: string }).error === "slow_down");
+  check("poll missing device_code → 400 invalid_request", ((await (await pollPost(pollReq(undefined))).json()) as { error?: string }).error === "invalid_request");
+  check("poll unknown device_code → 400 expired_token", ((await (await pollPost(pollReq("nope"))).json()) as { error?: string }).error === "expired_token");
+
+  // approve via confirm, then poll → custom token that actually signs in
+  const { idToken: pIdToken, uid: pUid } = await mintIdToken();
+  await confirmPost(confirmReq({ idToken: pIdToken, userCode: pf.userCode, action: "approve" }));
+  const pOk = await pollPost(pollReq(pf.deviceCode));
+  const pJson = (await pOk.json()) as { firebaseCustomToken?: string };
+  check("poll approved → 200 firebaseCustomToken", pOk.status === 200 && typeof pJson.firebaseCustomToken === "string" && pJson.firebaseCustomToken!.length > 0);
+  const exchangedIdToken = pJson.firebaseCustomToken ? await exchangeCustomToken(pJson.firebaseCustomToken) : null;
+  const exchangedUid = exchangedIdToken ? (await getAdminAuth()!.verifyIdToken(exchangedIdToken)).uid : null;
+  check("poll custom token signs in as the approving uid", exchangedUid === pUid);
+  check("poll after consume → 400 expired_token (single-use)", ((await (await pollPost(pollReq(pf.deviceCode))).json()) as { error?: string }).error === "expired_token");
+
+  // denied flow surfaces access_denied
+  const pd = await store.createDeviceLogin();
+  await store.denyDeviceLogin(pd.userCode);
+  check("poll denied → 400 access_denied", ((await (await pollPost(pollReq(pd.deviceCode))).json()) as { error?: string }).error === "access_denied");
 }
 
 run()
