@@ -52,6 +52,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Device-login state (issue #178, epic #186): pending/approved device codes
+    // for web-UI login over a second device. Managed exclusively through the
+    // Admin SDK (src/lib/auth/deviceLogin) — no client access whatsoever.
+    match /deviceLoginCodes/{deviceCodeHash} {
+      allow read, write: if false;
+    }
+
     // Spaces (issue #40): the organizing unit that replaces "My Todos / Shared
     // with me". Membership grants full access to everything in the space.
     // Rights model: any member may read and update (rename, recolor, add/remove

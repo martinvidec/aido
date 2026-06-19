@@ -431,6 +431,15 @@ await check('user may not read oauthRefreshTokens', assertFails(
 await check('user may not write oauthRefreshTokens', assertFails(
   setDoc(doc(db(ALICE), 'oauthRefreshTokens/hash1'), { uid: ALICE })));
 
+console.log('Device-login collection (admin-only, issue #178):');
+await check('user may not read deviceLoginCodes', assertFails(
+  getDoc(doc(db(ALICE), 'deviceLoginCodes/dc1'))));
+await check('user may not write deviceLoginCodes', assertFails(
+  setDoc(doc(db(ALICE), 'deviceLoginCodes/dc1'), { uid: ALICE, status: 'approved' })));
+await check('user may not query deviceLoginCodes', assertFails(
+  getDocs(query(collection(db(ALICE), 'deviceLoginCodes'),
+    where('userCode', '==', 'WDJBMJHT')))));
+
 await testEnv.cleanup();
 
 if (failures > 0) {
