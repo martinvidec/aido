@@ -24,6 +24,7 @@ initializeApp({ projectId }, "admin");
 const store = await import("../src/lib/auth/deviceLogin.ts");
 const { getAdminDb } = await import("../src/lib/firebase/admin.ts");
 const { POST: startPost } = await import("../src/app/api/auth/device/start/route.ts");
+const { POST: confirmPost } = await import("../src/app/api/auth/device/confirm/route.ts");
 
 const sha256 = (v: string) => createHash("sha256").update(v).digest("hex");
 
@@ -32,6 +33,25 @@ function startReq(ip = "5.0.0.1"): Request {
     method: "POST",
     headers: { "content-type": "application/json", "x-forwarded-for": ip, "x-forwarded-host": "aido.example", "x-forwarded-proto": "https" },
   });
+}
+
+function confirmReq(bodyObj: unknown, ip = "6.0.0.1"): Request {
+  return new Request("https://aido.example/api/auth/device/confirm", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-forwarded-for": ip },
+    body: JSON.stringify(bodyObj),
+  });
+}
+
+// Mint a real emulator Firebase ID token via the Auth emulator REST API.
+async function mintIdToken(): Promise<{ idToken: string; uid: string }> {
+  const host = process.env.FIREBASE_AUTH_EMULATOR_HOST;
+  const res = await fetch(
+    `http://${host}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake-key`,
+    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ returnSecureToken: true }) }
+  );
+  const data = (await res.json()) as { idToken: string; localId: string };
+  return { idToken: data.idToken, uid: data.localId };
 }
 
 let failures = 0;
@@ -130,6 +150,28 @@ async function run() {
     if (r.status === 429) { limited = true; break; }
   }
   check("start → rate-limited after the per-IP cap", limited);
+
+  // --- confirm endpoint (issue #180): approve binds the real uid; poll → approved ---
+  const ca = await store.createDeviceLogin();
+  const { idToken, uid } = await mintIdToken();
+  const caRes = await confirmPost(confirmReq({ idToken, userCode: ca.userCode, action: "approve" }));
+  const caJson = (await caRes.json()) as { status?: string };
+  check("confirm approve → 200 {status: approved}", caRes.status === 200 && caJson.status === "approved");
+  const caPoll = await store.pollDeviceLogin(ca.deviceCode);
+  check("confirm approve binds the real uid", caPoll.kind === "approved" && (caPoll as { uid: string }).uid === uid);
+
+  // deny
+  const cd = await store.createDeviceLogin();
+  const cdRes = await confirmPost(confirmReq({ idToken, userCode: cd.userCode, action: "deny" }));
+  check("confirm deny → 200 {status: denied}", cdRes.status === 200 && ((await cdRes.json()) as { status?: string }).status === "denied");
+  check("confirm deny → poll denied", (await store.pollDeviceLogin(cd.deviceCode)).kind === "denied");
+
+  // error cases
+  const cerr = await store.createDeviceLogin();
+  check("confirm invalid id token → 401", (await confirmPost(confirmReq({ idToken: "not-a-token", userCode: cerr.userCode, action: "approve" }))).status === 401);
+  check("confirm unknown user_code → 400", (await confirmPost(confirmReq({ idToken, userCode: "ZZZZ-ZZZZ", action: "approve" }))).status === 400);
+  check("confirm missing fields → 400", (await confirmPost(confirmReq({ idToken, action: "approve" }))).status === 400);
+  check("confirm bad action → 400", (await confirmPost(confirmReq({ idToken, userCode: cerr.userCode, action: "frobnicate" }))).status === 400);
 }
 
 run()
