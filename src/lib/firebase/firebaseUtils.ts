@@ -285,6 +285,51 @@ export const setTodoStatus = (
 export const deleteTodo = (spaceId: string, todoId: string) =>
   deleteDoc(todoRef(spaceId, todoId));
 
+// Move a todo to another space (issue #200). Because spaceId is part of the
+// Firestore path this can't be an updateDoc: it's a create in the target plus a
+// delete in the source, committed as one writeBatch so a move can never leave a
+// duplicate or lose the todo. All fields carry over; createdBy/createdAt are
+// preserved (firestore.rules keys the writer check on modifiedBy, #199, and
+// requires createdBy to be a member of the target — the caller must check that
+// before calling). order is recomputed to land at the end of the target list;
+// waitingOn is cleared when the target space doesn't have that member, since the
+// rules reject a waitingOn pointing at a non-member. Returns the new todo id.
+export const moveTodoToSpace = async (
+  todo: Todo,
+  targetSpaceId: string,
+  uid: string,
+  opts?: { clearWaitingOn?: boolean }
+): Promise<string> => {
+  if (!todo.spaceId || !todo.id || !targetSpaceId || !uid) {
+    throw new Error("Missing todo, target space or user.");
+  }
+  if (targetSpaceId === todo.spaceId) throw new Error("Todo is already in this space.");
+
+  const last = await getDocs(
+    query(todosCol(targetSpaceId), orderBy("order", "desc"), limit(1))
+  );
+  const maxOrder = last.empty ? 0 : (last.docs[0].data().order ?? 0);
+
+  const targetRef = doc(todosCol(targetSpaceId));
+  const batch = writeBatch(db);
+  batch.set(targetRef, {
+    spaceId: targetSpaceId,
+    title: todo.title,
+    body: todo.body ?? null,
+    completed: todo.completed,
+    waitingOn: opts?.clearWaitingOn ? null : todo.waitingOn,
+    tags: todo.tags,
+    mentions: todo.mentions,
+    createdBy: todo.createdBy,
+    modifiedBy: uid,
+    createdAt: todo.createdAt ?? serverTimestamp(),
+    order: maxOrder + 1,
+  });
+  batch.delete(todoRef(todo.spaceId, todo.id));
+  await batch.commit();
+  return targetRef.id;
+};
+
 // --- Daily "Heute" items (space-scoped, issue #41) ---
 // Short-lived items, deliberately separate from todos (never appear in the list).
 

@@ -22,6 +22,7 @@ import {
   setTodoWaitingOn,
   setTodoStatus,
   deleteTodo,
+  moveTodoToSpace,
 } from "@/lib/firebase/firebaseUtils";
 import type { MentionMember } from "@/lib/utils/textUtils";
 import type { Todo, TiptapContent } from "@/lib/types";
@@ -51,6 +52,13 @@ interface TodosContextType {
   /** Atomic status transition (completed + waitingOn in one write); board drops. */
   setStatus: (id: string, status: { completed: boolean; waitingOn: string | null }) => Promise<void>;
   remove: (id: string) => Promise<void>;
+  /**
+   * Move a todo to another space (issue #200). Blocks with an error toast if the
+   * todo's creator isn't a member of the target (the rules would reject it). On
+   * success shows a confirmation toast and returns true. `waitingOn` is cleared
+   * when the target doesn't have that member.
+   */
+  moveTodo: (id: string, targetSpaceId: string) => Promise<boolean>;
 }
 
 const TodosContext = createContext<TodosContextType | undefined>(undefined);
@@ -61,8 +69,8 @@ const TodosContext = createContext<TodosContextType | undefined>(undefined);
  */
 export const TodosProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
-  const { activeSpaceId, activeSpace, setOpenCount } = useSpaces();
-  const { showError } = useToast();
+  const { spaces, activeSpaceId, activeSpace, setOpenCount } = useSpaces();
+  const { showToast, showError } = useToast();
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
   const [tagFilters, setTagFilters] = useState<string[]>([]);
@@ -245,6 +253,32 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
     [activeSpaceId, showError]
   );
 
+  const moveTodo = useCallback(
+    async (id: string, targetSpaceId: string): Promise<boolean> => {
+      if (!user) return false;
+      const todo = todos.find((t) => t.id === id);
+      const target = spaces.find((s) => s.id === targetSpaceId);
+      if (!todo || !target) return false;
+      // The rules require the (preserved) creator to be a member of the target;
+      // check here so the user gets a clear message instead of a permission error.
+      if (!target.members.includes(todo.createdBy)) {
+        showError("Verschieben nicht möglich: der Ersteller hat keinen Zugriff auf diesen Space.");
+        return false;
+      }
+      const clearWaitingOn = !!todo.waitingOn && !target.members.includes(todo.waitingOn);
+      try {
+        await moveTodoToSpace(todo, targetSpaceId, user.uid, { clearWaitingOn });
+        showToast(`In „${target.name}" verschoben.`);
+        return true;
+      } catch (e) {
+        console.error("moveTodo failed", e);
+        showError("Todo konnte nicht verschoben werden.");
+        return false;
+      }
+    },
+    [user, todos, spaces, showToast, showError]
+  );
+
   const value: TodosContextType = {
     todos,
     loading,
@@ -260,6 +294,7 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
     setWaitingOn,
     setStatus,
     remove,
+    moveTodo,
   };
 
   return <TodosContext.Provider value={value}>{children}</TodosContext.Provider>;
