@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
+import { useSpaces } from "@/lib/contexts/SpacesContext";
 import Avatar from "../Avatar";
 import BottomSheet from "../BottomSheet";
+import MoveToSpaceMenu from "../MoveToSpaceMenu";
 import BoardGroupToggle from "./BoardGroupToggle";
 import ColumnHeader from "./ColumnHeader";
 import TodoCard from "./TodoCard";
@@ -17,9 +19,13 @@ import type { Todo } from "@/lib/types";
 export default function MobileBoard() {
   const [groupBy, setGroupBy] = useState<GroupBy>("person");
   const { columns, loading, accent, nameOf } = useBoardColumns(groupBy);
+  const { spaces } = useSpaces();
   const [moveCard, setMoveCard] = useState<Todo | null>(null);
+  const [moveSpaceCard, setMoveSpaceCard] = useState<Todo | null>(null);
 
   const targets = columns.filter((c) => c.apply);
+  // All board todos live in the active space, so "another space exists" is global.
+  const canMoveToSpace = spaces.length > 1;
 
   return (
     <div className="flex flex-col gap-4">
@@ -32,7 +38,14 @@ export default function MobileBoard() {
           <section key={col.id} className="flex flex-col gap-2">
             <ColumnHeader col={col} nameOf={nameOf} />
             {col.todos.map((t) => (
-              <TodoCard key={t.id} todo={t} accent={accent} nameOf={nameOf} onMove={() => setMoveCard(t)} />
+              <TodoCard
+                key={t.id}
+                todo={t}
+                accent={accent}
+                nameOf={nameOf}
+                onMove={() => setMoveCard(t)}
+                onMoveToSpace={canMoveToSpace ? () => setMoveSpaceCard(t) : undefined}
+              />
             ))}
             {col.todos.length === 0 && <p className="text-xs text-text-dim">—</p>}
           </section>
@@ -57,6 +70,20 @@ export default function MobileBoard() {
             </button>
           ))}
         </div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={!!moveSpaceCard}
+        onClose={() => setMoveSpaceCard(null)}
+        title="In Space verschieben"
+      >
+        {moveSpaceCard && (
+          <MoveToSpaceMenu
+            todo={moveSpaceCard}
+            nameOf={nameOf}
+            onDone={() => setMoveSpaceCard(null)}
+          />
+        )}
       </BottomSheet>
     </div>
   );

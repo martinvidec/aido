@@ -1,18 +1,28 @@
 "use client";
 
 import React, { useState } from "react";
+import { useSpaces } from "@/lib/contexts/SpacesContext";
+import BottomSheet from "../BottomSheet";
+import MoveToSpaceMenu from "../MoveToSpaceMenu";
 import BoardGroupToggle from "./BoardGroupToggle";
 import ColumnHeader from "./ColumnHeader";
 import TodoCard from "./TodoCard";
 import { useBoardColumns } from "./useBoardColumns";
 import { type BoardColumn, type GroupBy } from "./columns";
+import type { Todo } from "@/lib/types";
 
 /** Desktop Board view (issue #46): horizontal columns with HTML5 drag & drop. */
 export default function BoardView() {
   const [groupBy, setGroupBy] = useState<GroupBy>("person");
   const { columns, loading, accent, nameOf } = useBoardColumns(groupBy);
+  const { spaces } = useSpaces();
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
+  // Drag & drop moves cards between columns (same space); "In Space" opens a
+  // picker to move to another space (issue #202). All board todos are in the
+  // active space, so "another space exists" is global.
+  const [moveSpaceCard, setMoveSpaceCard] = useState<Todo | null>(null);
+  const canMoveToSpace = spaces.length > 1;
 
   const onDrop = async (col: BoardColumn) => {
     const id = dragId;
@@ -65,6 +75,7 @@ export default function BoardView() {
                   nameOf={nameOf}
                   draggable
                   onDragStart={() => setDragId(t.id)}
+                  onMoveToSpace={canMoveToSpace ? () => setMoveSpaceCard(t) : undefined}
                 />
               ))}
               {col.todos.length === 0 && col.apply && (
@@ -74,6 +85,20 @@ export default function BoardView() {
           ))}
         </div>
       )}
+
+      <BottomSheet
+        open={!!moveSpaceCard}
+        onClose={() => setMoveSpaceCard(null)}
+        title="In Space verschieben"
+      >
+        {moveSpaceCard && (
+          <MoveToSpaceMenu
+            todo={moveSpaceCard}
+            nameOf={nameOf}
+            onDone={() => setMoveSpaceCard(null)}
+          />
+        )}
+      </BottomSheet>
     </div>
   );
 }
