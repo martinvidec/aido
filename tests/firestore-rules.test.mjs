@@ -302,58 +302,102 @@ console.log('  todo writes (full collaboration):');
 await check('member (non-creator) may create a todo', assertSucceeds(
   setDoc(doc(db(BOB), `spaces/${TS}/todos/t2`), {
     spaceId: TS, title: 'b', body: null, completed: false, waitingOn: null,
-    tags: [], mentions: [], createdBy: BOB, createdAt: 1, order: 1 })));
-await check('member may not create a todo authored by someone else', assertFails(
+    tags: [], mentions: [], createdBy: BOB, modifiedBy: BOB, createdAt: 1, order: 1 })));
+// modifiedBy/createdBy (issue #199): the "who wrote this" check is on modifiedBy,
+// so a member MAY create a todo authored by ANOTHER member — this is what a move
+// does (createdBy stays the original author). createdBy must still be a member.
+await check('member may create a todo authored by another member (move)', assertSucceeds(
   setDoc(doc(db(BOB), `spaces/${TS}/todos/t3`), {
     spaceId: TS, title: 'x', completed: false, waitingOn: null,
-    tags: [], mentions: [], createdBy: ALICE, createdAt: 1, order: 1 })));
+    tags: [], mentions: [], createdBy: ALICE, modifiedBy: BOB, createdAt: 1, order: 1 })));
+await check('member may not create a todo whose createdBy is a non-member', assertFails(
+  setDoc(doc(db(BOB), `spaces/${TS}/todos/t3b`), {
+    spaceId: TS, title: 'x', completed: false, waitingOn: null,
+    tags: [], mentions: [], createdBy: MALLORY, modifiedBy: BOB, createdAt: 1, order: 1 })));
+await check('member may not create a todo with a forged modifiedBy', assertFails(
+  setDoc(doc(db(BOB), `spaces/${TS}/todos/t3c`), {
+    spaceId: TS, title: 'x', completed: false, waitingOn: null,
+    tags: [], mentions: [], createdBy: BOB, modifiedBy: ALICE, createdAt: 1, order: 1 })));
+await check('member may not create a todo with no modifiedBy', assertFails(
+  setDoc(doc(db(BOB), `spaces/${TS}/todos/t3d`), {
+    spaceId: TS, title: 'x', completed: false, waitingOn: null,
+    tags: [], mentions: [], createdBy: BOB, createdAt: 1, order: 1 })));
 await check('non-member may not create a todo', assertFails(
   setDoc(doc(db(MALLORY), `spaces/${TS}/todos/t4`), {
     spaceId: TS, title: 'x', completed: false, waitingOn: null,
-    tags: [], mentions: [], createdBy: MALLORY, createdAt: 1, order: 1 })));
+    tags: [], mentions: [], createdBy: MALLORY, modifiedBy: MALLORY, createdAt: 1, order: 1 })));
 await check('member may not create a todo with non-list tags', assertFails(
   setDoc(doc(db(ALICE), `spaces/${TS}/todos/t5`), {
     spaceId: TS, title: 'x', completed: false, waitingOn: null,
-    tags: 'a', mentions: [], createdBy: ALICE, createdAt: 1, order: 1 })));
-// Field-type validation (issue #71).
+    tags: 'a', mentions: [], createdBy: ALICE, modifiedBy: ALICE, createdAt: 1, order: 1 })));
+// Field-type validation (issue #71). modifiedBy is valid here so each fails
+// specifically on the field under test, not on the modifiedBy check.
 await check('member may not create a todo with non-string title', assertFails(
   setDoc(doc(db(ALICE), `spaces/${TS}/todos/t6`), {
     spaceId: TS, title: 42, completed: false, waitingOn: null,
-    tags: [], mentions: [], createdBy: ALICE, createdAt: 1, order: 1 })));
+    tags: [], mentions: [], createdBy: ALICE, modifiedBy: ALICE, createdAt: 1, order: 1 })));
 await check('member may not create a todo with non-bool completed', assertFails(
   setDoc(doc(db(ALICE), `spaces/${TS}/todos/t7`), {
     spaceId: TS, title: 'x', completed: 42, waitingOn: null,
-    tags: [], mentions: [], createdBy: ALICE, createdAt: 1, order: 1 })));
+    tags: [], mentions: [], createdBy: ALICE, modifiedBy: ALICE, createdAt: 1, order: 1 })));
 await check('member may not create a todo with non-number order', assertFails(
   setDoc(doc(db(ALICE), `spaces/${TS}/todos/t8`), {
     spaceId: TS, title: 'x', completed: false, waitingOn: null,
-    tags: [], mentions: [], createdBy: ALICE, createdAt: 1, order: 'x' })));
+    tags: [], mentions: [], createdBy: ALICE, modifiedBy: ALICE, createdAt: 1, order: 'x' })));
 await check('member may not create a todo with a mismatched spaceId', assertFails(
   setDoc(doc(db(ALICE), `spaces/${TS}/todos/t9`), {
     spaceId: 'other-space', title: 'x', completed: false, waitingOn: null,
-    tags: [], mentions: [], createdBy: ALICE, createdAt: 1, order: 1 })));
+    tags: [], mentions: [], createdBy: ALICE, modifiedBy: ALICE, createdAt: 1, order: 1 })));
 await check('member may not create a todo with a non-map body', assertFails(
   setDoc(doc(db(ALICE), `spaces/${TS}/todos/t10`), {
     spaceId: TS, title: 'x', body: 'oops', completed: false, waitingOn: null,
-    tags: [], mentions: [], createdBy: ALICE, createdAt: 1, order: 1 })));
+    tags: [], mentions: [], createdBy: ALICE, modifiedBy: ALICE, createdAt: 1, order: 1 })));
 await check('member may not update completed to a non-bool', assertFails(
-  updateDoc(doc(db(BOB), TODO2_PATH), { completed: 42 })));
+  updateDoc(doc(db(BOB), TODO2_PATH), { completed: 42, modifiedBy: BOB })));
 await check('member may not update order to a non-number', assertFails(
-  updateDoc(doc(db(BOB), TODO2_PATH), { order: 'x' })));
-await check('member (non-creator) may edit a todo (content + completed)', assertSucceeds(
-  updateDoc(doc(db(BOB), TODO2_PATH), { title: 'edited', completed: true })));
+  updateDoc(doc(db(BOB), TODO2_PATH), { order: 'x', modifiedBy: BOB })));
+// The seed todo carries no modifiedBy (legacy, pre-#198). NFA-04: it stays
+// editable as long as the update supplies modifiedBy == caller.
+await check('member (non-creator) may edit a legacy todo, stamping modifiedBy', assertSucceeds(
+  updateDoc(doc(db(BOB), TODO2_PATH), { title: 'edited', completed: true, modifiedBy: BOB })));
+await check('member may not update a todo with a forged modifiedBy', assertFails(
+  updateDoc(doc(db(BOB), TODO2_PATH), { completed: true, modifiedBy: ALICE })));
 await check('member may not change a todo createdBy (takeover)', assertFails(
-  updateDoc(doc(db(BOB), TODO2_PATH), { createdBy: BOB })));
+  updateDoc(doc(db(BOB), TODO2_PATH), { createdBy: BOB, modifiedBy: BOB })));
 await check('non-member may not update a todo', assertFails(
-  updateDoc(doc(db(MALLORY), TODO2_PATH), { completed: true })));
+  updateDoc(doc(db(MALLORY), TODO2_PATH), { completed: true, modifiedBy: MALLORY })));
 
 console.log('  waitingOn validation:');
 await check('member may set waitingOn to a space member', assertSucceeds(
-  updateDoc(doc(db(ALICE), TODO2_PATH), { waitingOn: BOB })));
+  updateDoc(doc(db(ALICE), TODO2_PATH), { waitingOn: BOB, modifiedBy: ALICE })));
 await check('member may clear waitingOn (null)', assertSucceeds(
-  updateDoc(doc(db(ALICE), TODO2_PATH), { waitingOn: null })));
+  updateDoc(doc(db(ALICE), TODO2_PATH), { waitingOn: null, modifiedBy: ALICE })));
 await check('member may not set waitingOn to a non-member', assertFails(
-  updateDoc(doc(db(ALICE), TODO2_PATH), { waitingOn: MALLORY })));
+  updateDoc(doc(db(ALICE), TODO2_PATH), { waitingOn: MALLORY, modifiedBy: ALICE })));
+
+// Move to another space (issue #199/#200): a move is a create in the target +
+// delete in the source. The create must carry the ORIGINAL createdBy, which is
+// only allowed when that author is a member of the target space (FA-06).
+console.log('  move to another space:');
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  // Target B: both ALICE and BOB are members. Target C: ALICE only.
+  await setDoc(doc(ctx.firestore(), 'spaces/move-b'), {
+    name: 'B', color: 40, members: [ALICE, BOB], createdBy: ALICE, createdAt: 1 });
+  await setDoc(doc(ctx.firestore(), 'spaces/move-c'), {
+    name: 'C', color: 80, members: [ALICE], createdBy: ALICE, createdAt: 1 });
+});
+await check("mover may recreate a member's todo in a target the author belongs to", assertSucceeds(
+  setDoc(doc(db(ALICE), 'spaces/move-b/todos/moved'), {
+    spaceId: 'move-b', title: 'm', body: null, completed: false, waitingOn: null,
+    tags: [], mentions: [], createdBy: BOB, modifiedBy: ALICE, createdAt: 1, order: 1 })));
+await check('mover may not recreate a todo in a target the author cannot access', assertFails(
+  setDoc(doc(db(ALICE), 'spaces/move-c/todos/moved'), {
+    spaceId: 'move-c', title: 'm', body: null, completed: false, waitingOn: null,
+    tags: [], mentions: [], createdBy: BOB, modifiedBy: ALICE, createdAt: 1, order: 1 })));
+await check('non-member may not recreate (move into) a space', assertFails(
+  setDoc(doc(db(MALLORY), 'spaces/move-b/todos/moved2'), {
+    spaceId: 'move-b', title: 'm', body: null, completed: false, waitingOn: null,
+    tags: [], mentions: [], createdBy: ALICE, modifiedBy: MALLORY, createdAt: 1, order: 1 })));
 
 console.log('  todo delete:');
 await check('non-member may not delete a todo', assertFails(
