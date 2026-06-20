@@ -119,6 +119,14 @@ service cloud.firestore {
           return (!('tags' in request.resource.data) || request.resource.data.tags is list)
               && (!('mentions' in request.resource.data) || request.resource.data.mentions is list);
         }
+        // The "who wrote this" check rides on modifiedBy, not createdBy (issue
+        // #198/#199): every create/update must stamp modifiedBy with the caller.
+        // This frees createdBy to be preserved when a todo is MOVED to another
+        // space (issue #200) — the mover writes a doc whose createdBy is still
+        // the original author — while keeping the actual writer unforgeable.
+        function isValidModifiedBy() {
+          return request.resource.data.modifiedBy == request.auth.uid;
+        }
         function hasValidWaitingOn() {
           return !('waitingOn' in request.resource.data)
               || request.resource.data.waitingOn == null
@@ -142,13 +150,19 @@ service cloud.firestore {
         }
 
         allow read: if isMemberOfThisSpace();
+        // createdBy must be a member of THIS space — on a normal create that is
+        // the caller; on a move it is the original author, who must therefore
+        // have access to the target space (issue #200). modifiedBy == caller
+        // stops anyone forging the writer.
         allow create: if isMemberOfThisSpace()
-          && request.resource.data.createdBy == request.auth.uid
+          && isValidModifiedBy()
+          && request.resource.data.createdBy in thisSpaceMembers()
           && hasValidTodoLists()
           && hasValidTodoFields()
           && hasValidWaitingOn();
         allow update: if isMemberOfThisSpace()
           && request.resource.data.createdBy == resource.data.createdBy
+          && isValidModifiedBy()
           && hasValidTodoLists()
           && hasValidTodoFields()
           && hasValidWaitingOn();
