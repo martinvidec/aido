@@ -226,14 +226,15 @@ export const SpacesProvider = ({ children }: { children: ReactNode }) => {
 
   const removeMember = useCallback(
     async (spaceId: string, uid: string) => {
+      if (!user) return;
       try {
-        await removeSpaceMember(spaceId, uid);
+        await removeSpaceMember(spaceId, uid, user.uid);
       } catch (e) {
         console.error("removeMember failed", e);
         showError("Mitglied konnte nicht entfernt werden.");
       }
     },
-    [showError]
+    [user, showError]
   );
 
   const setOpenCount = useCallback((spaceId: string, count: number) => {

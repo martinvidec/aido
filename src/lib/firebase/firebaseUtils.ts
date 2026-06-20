@@ -124,13 +124,19 @@ export const addSpaceMember = (spaceId: string, uid: string) =>
 // the todo can no longer be completed or edited, only deleted (issue #63). Done
 // as one atomic batch so there is never a window where the member is gone but
 // the dangling references remain.
-export const removeSpaceMember = async (spaceId: string, uid: string) => {
+export const removeSpaceMember = async (
+  spaceId: string,
+  uid: string,
+  actorUid: string
+) => {
   const stranded = await getDocs(
     query(todosCol(spaceId), where("waitingOn", "==", uid))
   );
   const batch = writeBatch(db);
   batch.update(doc(db, SPACES_COLLECTION, spaceId), { members: arrayRemove(uid) });
-  stranded.forEach((d) => batch.update(d.ref, { waitingOn: null }));
+  // Clearing the dangling waitingOn is a todo update, so it must carry the actor
+  // as modifiedBy to satisfy the rules' `modifiedBy == auth.uid` check (#198).
+  stranded.forEach((d) => batch.update(d.ref, { waitingOn: null, modifiedBy: actorUid }));
   await batch.commit();
 };
 
@@ -160,6 +166,14 @@ const mapTodo = (d: QueryDocumentSnapshot<DocumentData>): Todo => {
     tags: Array.isArray(data.tags) ? data.tags : [],
     mentions: Array.isArray(data.mentions) ? data.mentions : [],
     createdBy: typeof data.createdBy === "string" ? data.createdBy : "",
+    // Legacy todos (pre-#198) carry no modifiedBy; fall back to createdBy so the
+    // field is always populated for the UI and the rules' merge-update checks.
+    modifiedBy:
+      typeof data.modifiedBy === "string"
+        ? data.modifiedBy
+        : typeof data.createdBy === "string"
+          ? data.createdBy
+          : "",
     createdAt: data.createdAt ?? null,
     order: typeof data.order === "number" ? data.order : 0,
   };
@@ -188,6 +202,7 @@ export const createTodo = async (
     tags: deriveTags(input.title, body),
     mentions: deriveMentions(body, input.title, input.mentionMembers),
     createdBy: uid,
+    modifiedBy: uid,
     createdAt: serverTimestamp(),
     order: input.order ?? 0,
   });
@@ -230,6 +245,7 @@ export const editTodoContent = (
   todoId: string,
   title: string,
   body: TiptapContent | null,
+  uid: string,
   mentionMembers?: MentionMember[]
 ) =>
   updateDoc(todoRef(spaceId, todoId), {
@@ -237,16 +253,22 @@ export const editTodoContent = (
     body,
     tags: deriveTags(title, body),
     mentions: deriveMentions(body, title, mentionMembers),
+    modifiedBy: uid,
   });
 
-export const setTodoCompleted = (spaceId: string, todoId: string, completed: boolean) =>
-  updateDoc(todoRef(spaceId, todoId), { completed });
+export const setTodoCompleted = (
+  spaceId: string,
+  todoId: string,
+  completed: boolean,
+  uid: string
+) => updateDoc(todoRef(spaceId, todoId), { completed, modifiedBy: uid });
 
 export const setTodoWaitingOn = (
   spaceId: string,
   todoId: string,
-  waitingOn: string | null
-) => updateDoc(todoRef(spaceId, todoId), { waitingOn });
+  waitingOn: string | null,
+  uid: string
+) => updateDoc(todoRef(spaceId, todoId), { waitingOn, modifiedBy: uid });
 
 // Atomic status transition for the board status drops (issue #79): writes
 // `completed` and `waitingOn` together in one updateDoc, so a card never flashes
@@ -256,8 +278,9 @@ export const setTodoWaitingOn = (
 export const setTodoStatus = (
   spaceId: string,
   todoId: string,
-  status: { completed: boolean; waitingOn: string | null }
-) => updateDoc(todoRef(spaceId, todoId), status);
+  status: { completed: boolean; waitingOn: string | null },
+  uid: string
+) => updateDoc(todoRef(spaceId, todoId), { ...status, modifiedBy: uid });
 
 export const deleteTodo = (spaceId: string, todoId: string) =>
   deleteDoc(todoRef(spaceId, todoId));
@@ -961,6 +984,7 @@ export const migrateLegacyTodos = async (uid: string): Promise<void> => {
           tags,
           mentions,
           createdBy: uid,
+          modifiedBy: uid,
           createdAt: serverTimestamp(),
           order,
         });

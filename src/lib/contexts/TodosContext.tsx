@@ -180,9 +180,9 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
 
   const editContent = useCallback(
     async (id: string, title: string, body: TiptapContent | null): Promise<boolean> => {
-      if (!activeSpaceId) return false;
+      if (!activeSpaceId || !user) return false;
       try {
-        await editTodoContent(activeSpaceId, id, title, body, mentionMembers);
+        await editTodoContent(activeSpaceId, id, title, body, user.uid, mentionMembers);
         return true;
       } catch (e) {
         console.error("editContent failed", e);
@@ -190,46 +190,46 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
     },
-    [activeSpaceId, mentionMembers, showError]
+    [activeSpaceId, user, mentionMembers, showError]
   );
 
   const setCompleted = useCallback(
     async (id: string, completed: boolean) => {
-      if (!activeSpaceId) return;
+      if (!activeSpaceId || !user) return;
       try {
-        await setTodoCompleted(activeSpaceId, id, completed);
+        await setTodoCompleted(activeSpaceId, id, completed, user.uid);
       } catch (e) {
         console.error("setCompleted failed", e);
         showError("Status konnte nicht geändert werden.");
       }
     },
-    [activeSpaceId, showError]
+    [activeSpaceId, user, showError]
   );
 
   const setWaitingOn = useCallback(
     async (id: string, waitingOn: string | null) => {
-      if (!activeSpaceId) return;
+      if (!activeSpaceId || !user) return;
       try {
-        await setTodoWaitingOn(activeSpaceId, id, waitingOn);
+        await setTodoWaitingOn(activeSpaceId, id, waitingOn, user.uid);
       } catch (e) {
         console.error("setWaitingOn failed", e);
         showError("Zuweisung konnte nicht gespeichert werden.");
       }
     },
-    [activeSpaceId, showError]
+    [activeSpaceId, user, showError]
   );
 
   const setStatus = useCallback(
     async (id: string, status: { completed: boolean; waitingOn: string | null }) => {
-      if (!activeSpaceId) return;
+      if (!activeSpaceId || !user) return;
       try {
-        await setTodoStatus(activeSpaceId, id, status);
+        await setTodoStatus(activeSpaceId, id, status, user.uid);
       } catch (e) {
         console.error("setStatus failed", e);
         showError("Status konnte nicht geändert werden.");
       }
     },
-    [activeSpaceId, showError]
+    [activeSpaceId, user, showError]
   );
 
   const remove = useCallback(

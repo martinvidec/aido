@@ -255,6 +255,7 @@ export async function addTodo(
     tags: deriveTags(title, body),
     mentions: deriveMentions(body, title, members),
     createdBy: uid,
+    modifiedBy: uid,
     createdAt: FieldValue.serverTimestamp(),
     order: maxOrder + 1,
   });
@@ -274,7 +275,7 @@ export async function completeTodo(
   const ref = db.collection("spaces").doc(spaceId).collection("todos").doc(todoId);
   const snap = await ref.get();
   if (!snap.exists) throw new McpToolError("not_found", `Todo ${todoId} not found.`);
-  await ref.update({ completed: !!completed });
+  await ref.update({ completed: !!completed, modifiedBy: uid });
   return mapTodoView(await ref.get());
 }
 
@@ -293,7 +294,7 @@ export async function setWaitingOn(
   const ref = db.collection("spaces").doc(spaceId).collection("todos").doc(todoId);
   const snap = await ref.get();
   if (!snap.exists) throw new McpToolError("not_found", `Todo ${todoId} not found.`);
-  await ref.update({ waitingOn: userId });
+  await ref.update({ waitingOn: userId, modifiedBy: uid });
   return mapTodoView(await ref.get());
 }
 

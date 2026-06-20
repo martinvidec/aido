@@ -226,6 +226,7 @@ export async function migrateOwner(db, uid, { dryRun = false } = {}) {
         tags,
         mentions,
         createdBy: uid,
+        modifiedBy: uid,
         createdAt: FieldValue.serverTimestamp(),
         order,
       });

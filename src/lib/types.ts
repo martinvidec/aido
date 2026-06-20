@@ -43,6 +43,13 @@ export interface Todo {
   mentions: string[];
   /** Author; immutable after creation. */
   createdBy: string;
+  /**
+   * userId of the last writer. The rules enforce `modifiedBy == auth.uid` on
+   * every create/update, so the "who wrote this" check no longer rides on
+   * `createdBy` — that lets `createdBy` survive a move to another space while
+   * staying unforgeable (issue #198).
+   */
+  modifiedBy: string;
   createdAt: Timestamp | null;
   /**
    * Insertion order (`maxOrder + 1` at creation); drives the stable
