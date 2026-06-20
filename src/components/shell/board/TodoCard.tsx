@@ -13,12 +13,14 @@ interface TodoCardProps {
   nameOf: (uid: string) => string;
   draggable?: boolean;
   onDragStart?: () => void;
-  /** Mobile: open the "Verschieben" sheet for this card. */
+  /** Mobile: open the column "Verschieben" sheet for this card. */
   onMove?: () => void;
+  /** Open the "In Space" target-space picker for this card (issue #202). */
+  onMoveToSpace?: () => void;
 }
 
 /** Board card (issue #46): title + progress + "bei X" chip + check circle. */
-export default function TodoCard({ todo, accent, nameOf, draggable, onDragStart, onMove }: TodoCardProps) {
+export default function TodoCard({ todo, accent, nameOf, draggable, onDragStart, onMove, onMoveToSpace }: TodoCardProps) {
   const { setCompleted } = useTodos();
   const progress = checklistProgress(todo.body);
 
@@ -64,15 +66,29 @@ export default function TodoCard({ todo, accent, nameOf, draggable, onDragStart,
         </div>
       )}
 
-      {onMove && (
-        <button
-          type="button"
-          onClick={onMove}
-          className="self-end rounded-full border border-border px-3 py-1 text-xs font-semibold"
-          style={{ minHeight: 32 }}
-        >
-          Verschieben
-        </button>
+      {(onMove || onMoveToSpace) && (
+        <div className="flex flex-wrap justify-end gap-2">
+          {onMove && (
+            <button
+              type="button"
+              onClick={onMove}
+              className="rounded-full border border-border px-3 py-1 text-xs font-semibold"
+              style={{ minHeight: 32 }}
+            >
+              Verschieben
+            </button>
+          )}
+          {onMoveToSpace && (
+            <button
+              type="button"
+              onClick={onMoveToSpace}
+              className="rounded-full border border-border px-3 py-1 text-xs font-semibold"
+              style={{ minHeight: 32 }}
+            >
+              In Space
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

@@ -266,9 +266,24 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
       const clearWaitingOn = !!todo.waitingOn && !target.members.includes(todo.waitingOn);
+      const sourceSpaceId = todo.spaceId;
       try {
-        await moveTodoToSpace(todo, targetSpaceId, user.uid, { clearWaitingOn });
-        showToast(`In „${target.name}" verschoben.`);
+        const newId = await moveTodoToSpace(todo, targetSpaceId, user.uid, { clearWaitingOn });
+        // Undo (issue #202): move the now-target-resident todo back to its source.
+        // The source had the original members, so the original waitingOn is valid
+        // there again — reconstruct from the original `todo` (with the new id) so
+        // undo also restores a waitingOn the forward move had to clear.
+        showToast(`In „${target.name}" verschoben.`, {
+          label: "Rückgängig",
+          onAction: () => {
+            moveTodoToSpace({ ...todo, id: newId, spaceId: targetSpaceId }, sourceSpaceId, user.uid)
+              .then(() => showToast("Verschieben rückgängig gemacht."))
+              .catch((e) => {
+                console.error("undo move failed", e);
+                showError("Rückgängig machen fehlgeschlagen.");
+              });
+          },
+        });
         return true;
       } catch (e) {
         console.error("moveTodo failed", e);
