@@ -70,6 +70,15 @@ Model Context Protocol endpoint with `streamable-http` (POST) and SSE (GET) tran
 - End commit messages with the `Co-Authored-By: Claude Fable 5` trailer and PR bodies with the Claude Code footer.
 - Vercel is the only CI check; it occasionally sticks on "pending" — an empty commit on the branch retriggers it.
 
+## Spec → Issues (Epic pattern)
+
+When a spec (e.g. the `docs/0X-*.md` flow from the `concept-analysis-spec` skill) is broken into **multiple** issues, **always** create one **Epic** issue as the parent and link the others as native GitHub **sub-issues** (not just a checklist):
+
+1. Create the Epic first (`gh issue create --label epic …`); its body holds the goal, links to the `docs/` spec files, the ordered sub-issue list, and the deploy ordering.
+2. Create each child issue (`Teil von Epic #<epic>` in the body; reference the same `docs/`).
+3. Link each child to the Epic via the sub-issues REST API — the child's **database id** (`gh api repos/{owner}/{repo}/issues/<child> --jq .id`), then `gh api --method POST repos/{owner}/{repo}/issues/<epic>/sub_issues -F sub_issue_id=<dbId>`. Verify with `gh api repos/{owner}/{repo}/issues/<epic>/sub_issues --jq '.[].number'`.
+4. The `epic` label already exists. A single issue from a spec needs no Epic.
+
 ## Merging
 
 - **Documentation-only changes may be merged immediately, without waiting for green CI.** This covers Markdown/docs, the `docs/` folder, README, comments — anything that does not affect application code or build output.
