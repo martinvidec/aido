@@ -356,6 +356,12 @@ await check('member may not update completed to a non-bool', assertFails(
   updateDoc(doc(db(BOB), TODO2_PATH), { completed: 42, modifiedBy: BOB })));
 await check('member may not update order to a non-number', assertFails(
   updateDoc(doc(db(BOB), TODO2_PATH), { order: 'x', modifiedBy: BOB })));
+// Manual reordering (issue #235): a member may rewrite `order` (a fractional
+// midpoint), stamping modifiedBy; a non-member may not.
+await check('member may reorder a todo (fractional order)', assertSucceeds(
+  updateDoc(doc(db(BOB), TODO2_PATH), { order: 2.5, modifiedBy: BOB })));
+await check('non-member may not reorder a todo', assertFails(
+  updateDoc(doc(db(MALLORY), TODO2_PATH), { order: 2.5, modifiedBy: MALLORY })));
 // The seed todo carries no modifiedBy (legacy, pre-#198). NFA-04: it stays
 // editable as long as the update supplies modifiedBy == caller.
 await check('member (non-creator) may edit a legacy todo, stamping modifiedBy', assertSucceeds(
