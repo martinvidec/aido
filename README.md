@@ -54,6 +54,28 @@ claude mcp add --transport http aido https://<your-app>/api/mcp/sse \
 
 A **claim + lease** stops the same todo being picked up endlessly; a per-session **allowlist** (default: answer + handoff, *not* complete) and **scope to the claimed todo** bound what the loop can do. Manage sessions, allowlists and the lease in **Settings → Agent-Sessions**. No extra env var — this uses your personal API key.
 
+A todo bound to a session moves through this lifecycle — it only returns to the queue on a human turn or an expired lease, so the loop never re-picks the same item:
+
+```mermaid
+stateDiagram-v2
+    state "nicht gebunden" as Frei
+    state "bei aido" as Aido
+    state "in Arbeit" as InArbeit
+    state "bei dir" as User
+    state "erledigt" as Done
+
+    [*] --> Frei
+    Frei --> Aido: attach (UI)
+    Aido --> InArbeit: next-todo (claim + lease)
+    InArbeit --> User: handoff (bleibt offen)
+    InArbeit --> Done: complete-todo
+    InArbeit --> Aido: Lease abgelaufen
+    User --> Aido: Zurück an aido (User)
+    Aido --> Frei: Lösen (UI)
+    User --> Frei: Lösen (UI)
+    Done --> [*]
+```
+
 ### OAuth (claude.ai connector)
 aido is its own **OAuth Authorization Server** for the MCP resource server, reusing the existing Google login for consent:
 - Discovery: `/.well-known/oauth-protected-resource`, `/.well-known/oauth-authorization-server`
