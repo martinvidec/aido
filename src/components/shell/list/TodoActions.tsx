@@ -24,7 +24,7 @@ export default function TodoActions({
   onEdit: () => void;
   onClose: () => void;
 }) {
-  const { setWaitingOn, remove } = useTodos();
+  const { setWaitingOn, remove, reorder, filtered } = useTodos();
   const { activeSpace, spaces } = useSpaces();
   const [waitOpen, setWaitOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
@@ -33,6 +33,22 @@ export default function TodoActions({
 
   // FA-08: hide the move entry when there is nowhere to move the todo to.
   const hasTargets = spaces.some((s) => s.id !== todo.spaceId);
+
+  // Keyboard/A11y reorder fallback (issue #238): move the todo one slot within
+  // the *visible* open list (honours the tag filter, like drag & drop). Hidden
+  // at the edges and for done todos (the done section isn't reorderable).
+  const openOrdered = filtered.filter((t) => !t.completed);
+  const idx = openOrdered.findIndex((t) => t.id === todo.id);
+  const canUp = !todo.completed && idx > 0;
+  const canDown = !todo.completed && idx >= 0 && idx < openOrdered.length - 1;
+  const move = async (dir: -1 | 1) => {
+    const ids = openOrdered.map((t) => t.id);
+    const j = idx + dir;
+    if (j < 0 || j >= ids.length) return;
+    [ids[idx], ids[j]] = [ids[j], ids[idx]];
+    await reorder(todo.id, ids);
+    onClose();
+  };
 
   const item = "rounded-lg px-3 py-2 text-left text-sm hover:bg-row-hover";
 
@@ -49,6 +65,27 @@ export default function TodoActions({
       >
         Bearbeiten
       </button>
+
+      {canUp && (
+        <button
+          type="button"
+          className={item}
+          style={{ minHeight: 44 }}
+          onClick={() => move(-1)}
+        >
+          ↑ Nach oben
+        </button>
+      )}
+      {canDown && (
+        <button
+          type="button"
+          className={item}
+          style={{ minHeight: 44 }}
+          onClick={() => move(1)}
+        >
+          ↓ Nach unten
+        </button>
+      )}
 
       <button
         type="button"
