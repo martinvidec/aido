@@ -27,6 +27,7 @@ Responsive by design: a desktop shell (sidebar + scrolling column) and a dedicat
 ### Settings (`/settings`)
 - Profile (name, e-mail, photo), language, timezone, notification toggles; light / dark / system theme (oklch design tokens, persisted per user).
 - **Personal API key** (`aido_…`): generate / rotate / revoke for external integrations (e.g. Claude Code/Desktop). The plaintext is shown exactly once; only a SHA-256 hash is stored (`userApiKeys/{uid}`, admin-only). Requires `FIREBASE_SERVICE_ACCOUNT_KEY`.
+- **Agent-Sessions** (epic #212): manage the Claude-Code sessions you can hand todos to — rename, remove, set each session's tool **allowlist** and **lease**, plus the default lease for new sessions (see the MCP section below).
 
 ### MCP server (`/api/mcp/sse`)
 Model Context Protocol over **streamable HTTP**, stateless via [`mcp-handler`](https://www.npmjs.com/package/mcp-handler) (serverless-friendly — no in-memory session map). **14 Firestore-backed tools**, all member-gated and scoped to the caller's uid:
@@ -72,7 +73,7 @@ Access tokens are short-lived signed JWTs (`sub` = uid); refresh tokens are revo
 - **Next.js 15** (App Router), React 19, TypeScript, **Tailwind** (oklch design tokens, light/dark via `data-theme`)
 - **Firebase**: Auth, Firestore (client SDK v12); **firebase-admin** (v13) for token verification, the Admin-SDK MCP/OAuth data path, and API-key/OAuth storage
 - **Cloud Functions v2** (`functions/`): contact-invite e-mails
-- **Tiptap 2** for rich-text editing
+- **Tiptap 2** for rich-text editing; **markdown-it** for the server-side Markdown↔Tiptap conversion (Agent-Sessions)
 - **@modelcontextprotocol/sdk** + **mcp-handler** (MCP transport) · **jose** (OAuth JWTs) · **Zod 4**
 - **Vercel** hosting (auto-deploy on merge to `main`); **Node 24.x** runtime (`engines`)
 
@@ -100,8 +101,10 @@ Access tokens are short-lived signed JWTs (`sub` = uid); refresh tokens are revo
 | `npm run build` / `npm run start` | Production build / serve |
 | `npm run lint` | ESLint (next lint) |
 | `npm run test:rules` | Firestore + Storage security-rules tests (emulator) |
-| `npm run test:mcp` | MCP tool tests against the Firestore emulator (real tool code, via `tsx`) |
+| `npm run test:mcp` | MCP tool tests against the Firestore emulator (real tool code, incl. the Agent-Sessions loop, via `tsx`) |
+| `npm run test:markdown` | Markdown↔Tiptap module unit tests (no emulator, via `tsx`) |
 | `npm run test:oauth` | OAuth flow tests against the Firestore + Auth emulators (via `tsx`) |
+| `npm run test:device-login` | Device-login flow tests (Firestore + Auth emulators, via `tsx`) |
 | `npm run test:migration` | Legacy-todo → Spaces migration smoke test (emulator) |
 | `npm run migrate:legacy` | One-time admin migration of all users' legacy todos into spaces |
 
@@ -133,9 +136,9 @@ src/
     firebase/   # client SDK init, admin SDK init, data helpers
     mcp/        # auth guard, admin data layer, tool logic, request context
     oauth/      # tokens (JWT), PKCE, admin stores, config
-    tiptap/     # mention/hashtag extensions, link security
+    tiptap/     # mention/hashtag extensions, link security, Markdown↔Tiptap (markdown.ts)
 functions/      # Cloud Functions (invite e-mails)
-tests/          # emulator tests: rules, mcp, oauth, migration
+tests/          # emulator tests (rules, mcp, oauth, device-login, migration) + markdown unit
 docs/           # design handoff + concept/spec documents
 firestore.rules # Firestore security rules (the authority)
 storage.rules   # Storage security rules
