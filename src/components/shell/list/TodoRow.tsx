@@ -24,9 +24,15 @@ interface TodoRowProps {
    * would trap the z-40 popover below the next row and swallow its clicks.
    */
   dimmed?: boolean;
+  /**
+   * Optional drag grip rendered at the row's leading edge (issue #236). Supplied
+   * only for reorderable open rows; it owns the drag gesture (the row itself does
+   * not), so the checkbox/edit/expand stay clickable.
+   */
+  dragHandle?: React.ReactNode;
 }
 
-export default function TodoRow({ todo, nameOf, variant = "desktop", onOpenActions, dimmed }: TodoRowProps) {
+export default function TodoRow({ todo, nameOf, variant = "desktop", onOpenActions, dimmed, dragHandle }: TodoRowProps) {
   const { setCompleted, editContent } = useTodos();
   const { accent } = useSpaces();
 
@@ -71,6 +77,7 @@ export default function TodoRow({ todo, nameOf, variant = "desktop", onOpenActio
       style={variant === "mobile" ? { border: "1px solid var(--border)" } : undefined}
     >
       <div className="flex items-start gap-3">
+        {dragHandle}
         <div className="flex min-w-0 flex-1 items-start gap-3" style={dim}>
         <button
           type="button"
