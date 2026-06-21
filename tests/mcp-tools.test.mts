@@ -13,7 +13,7 @@
 // module; tsx transpiles the TS + resolves the @/* path alias from tsconfig.
 
 import { initializeApp } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 
 if (!process.env.FIRESTORE_EMULATOR_HOST) {
   console.error("FIRESTORE_EMULATOR_HOST is not set — run inside emulators:exec.");
@@ -29,7 +29,7 @@ const db = getFirestore(adminApp);
 
 // Import the real tool code AFTER the app exists (functions only touch Firestore
 // when called, so import order vs. init is safe, but keep it explicit).
-const { requireMember, listSpacesForUid, listTodos, addTodo, completeTodo, setWaitingOn, listDaily, addDaily, deleteTodo, whoami, listMembers, McpToolError } =
+const { requireMember, listSpacesForUid, listTodos, addTodo, completeTodo, setWaitingOn, listDaily, addDaily, deleteTodo, whoami, listMembers, registerSession, nextTodo, updateTodo, handoffTodo, McpToolError } =
   await import("../src/lib/mcp/data.ts");
 const { handleListSpaces } = await import("../src/lib/mcp/tool-logic.ts");
 const { runWithPrincipal } = await import("../src/lib/mcp/context.ts");
@@ -144,6 +144,67 @@ async function run() {
   check("list-members returns the space members with names",
     members.length === 2 && members.some((m) => m.uid === BOB && m.displayName === "Bob"));
   await expectError("list-members rejects non-members", "unauthorized", () => listMembers(CAROL, S1));
+
+  // --- Agent-Sessions (epic #212): register → next-todo (claim/lease) → update/handoff/complete ---
+  const HOST = "macbook";
+  const CWD = "/home/alice/proj";
+  const todoRef = (id: string) => db.collection("spaces").doc(S1).collection("todos").doc(id);
+
+  const sess = await registerSession(ALICE, { spaceId: S1, hostname: HOST, workingFolder: CWD });
+  check("register-session returns a 64-char sessionId", typeof sess.sessionId === "string" && sess.sessionId.length === 64);
+  check("register-session default allowlist is update-todo+handoff (no complete-todo)",
+    sess.allowedTools.includes("update-todo") && sess.allowedTools.includes("handoff") && !sess.allowedTools.includes("complete-todo"));
+  const sess2 = await registerSession(ALICE, { spaceId: S1, hostname: HOST, workingFolder: CWD });
+  check("register-session is deterministic (same id on re-register)", sess2.sessionId === sess.sessionId);
+  await expectError("register-session rejects non-members", "unauthorized",
+    () => registerSession(CAROL, { spaceId: S1, hostname: HOST, workingFolder: CWD }));
+  await expectError("next-todo without a registered session → not_found", "not_found",
+    () => nextTodo(ALICE, { spaceId: S1, hostname: "elsewhere", workingFolder: "/x" }));
+
+  // Two attached todos, explicit createdAt so "oldest first" is deterministic.
+  const attached = (createdAtMs: number) => ({
+    spaceId: S1, body: null, completed: false, waitingOn: null, tags: [], mentions: [],
+    createdBy: BOB, modifiedBy: BOB, createdAt: Timestamp.fromMillis(createdAtMs), order: 10,
+    attachedSession: sess.sessionId, aidoTurn: "aido", claimedBy: null, claimedAt: null,
+  });
+  await todoRef("a1").set({ ...attached(1000), title: "First question", order: 10 });
+  await todoRef("a2").set({ ...attached(2000), title: "Second question", order: 11 });
+
+  const first = await nextTodo(ALICE, { spaceId: S1, hostname: HOST, workingFolder: CWD });
+  check("next-todo returns the oldest attached todo", first?.todoId === "a1" && first?.title === "First question");
+  const again = await nextTodo(ALICE, { spaceId: S1, hostname: HOST, workingFolder: CWD });
+  check("next-todo self-claim is idempotent (same todo)", again?.todoId === "a1");
+
+  const upd = await updateTodo(ALICE, { sessionId: sess.sessionId, spaceId: S1, todoId: "a1", bodyMarkdown: "Antwort: `42`", mode: "append" });
+  check("update-todo keeps it open (not completed)", upd.completed === false);
+  const a1d = (await todoRef("a1").get()).data()!;
+  check("update-todo writes a Tiptap doc body", (a1d.body as { type?: string })?.type === "doc");
+  check("update-todo append keeps the claim", a1d.claimedBy === sess.sessionId);
+  check("update-todo stamps lastAidoEditAt", !!a1d.lastAidoEditAt);
+  await expectError("update-todo on an unclaimed todo → unauthorized", "unauthorized",
+    () => updateTodo(ALICE, { sessionId: sess.sessionId, spaceId: S1, todoId: "a2", bodyMarkdown: "x" }));
+
+  const ho = await handoffTodo(ALICE, { sessionId: sess.sessionId, spaceId: S1, todoId: "a1" });
+  check("handoff sets aidoTurn=user", ho.aidoTurn === "user");
+  check("handoff clears the claim", (await todoRef("a1").get()).data()!.claimedBy === null);
+
+  const second = await nextTodo(ALICE, { spaceId: S1, hostname: HOST, workingFolder: CWD });
+  check("next-todo advances to the next todo after handoff", second?.todoId === "a2");
+
+  await expectError("complete-todo via session blocked by default allowlist", "unauthorized",
+    () => completeTodo(ALICE, S1, "a2", true, sess.sessionId));
+  await registerSession(ALICE, { spaceId: S1, hostname: HOST, workingFolder: CWD, allowedTools: ["update-todo", "handoff", "complete-todo"] });
+  const comp = await completeTodo(ALICE, S1, "a2", true, sess.sessionId);
+  check("complete-todo via session works once allowed", comp.completed === true);
+  check("complete-todo via session clears the claim", (await todoRef("a2").get()).data()!.claimedBy === null);
+
+  // Lease: a stale claim by a DIFFERENT session is reclaimable.
+  await todoRef("a3").set({ ...attached(3000), title: "Stale", order: 12, claimedBy: "other-session", claimedAt: Timestamp.fromMillis(1) });
+  const reclaimed = await nextTodo(ALICE, { spaceId: S1, hostname: HOST, workingFolder: CWD });
+  check("next-todo reclaims a todo whose lease expired", reclaimed?.todoId === "a3");
+  await handoffTodo(ALICE, { sessionId: sess.sessionId, spaceId: S1, todoId: "a3" });
+  const none = await nextTodo(ALICE, { spaceId: S1, hostname: HOST, workingFolder: CWD });
+  check("next-todo returns null when nothing is queued", none === null);
 
   // --- principal gate (tool-logic): data tools require a user principal ---
   await expectError("no principal → unauthorized", "unauthorized", () => handleListSpaces());

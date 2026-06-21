@@ -16,6 +16,10 @@ import {
   handleDeleteTodo,
   handleWhoami,
   handleListMembers,
+  handleRegisterSession,
+  handleNextTodo,
+  handleUpdateTodo,
+  handleHandoff,
   errorResult,
 } from "@/lib/mcp/tool-logic";
 
@@ -70,8 +74,13 @@ const mcpHandler = createMcpHandler(
     );
     server.tool(
       "complete-todo",
-      "Marks a todo complete or open again.",
-      { spaceId: z.string().min(1), todoId: z.string().min(1), completed: z.boolean() },
+      "Marks a todo complete or open again. Pass sessionId when completing the todo your agent session has claimed (requires the 'complete-todo' allowlist entry).",
+      {
+        spaceId: z.string().min(1),
+        todoId: z.string().min(1),
+        completed: z.boolean(),
+        sessionId: z.string().optional(),
+      },
       (args) => safe(() => handleCompleteTodo(args))
     );
     server.tool(
@@ -108,6 +117,43 @@ const mcpHandler = createMcpHandler(
       "Lists the members (uid + display name) of a space you belong to.",
       { spaceId: z.string().min(1) },
       (args) => safe(() => handleListMembers(args))
+    );
+    // --- Agent-Sessions (epic #212): the work loop ---
+    server.tool(
+      "register-session",
+      "Registers (or refreshes) a Claude-Code agent session bound to one space. Call this FIRST; returns a sessionId for update-todo/handoff. Default allowlist is ['update-todo','handoff'].",
+      {
+        spaceId: z.string().min(1),
+        hostname: z.string().min(1),
+        workingFolder: z.string().min(1),
+        label: z.string().optional(),
+        allowedTools: z.array(z.enum(["update-todo", "handoff", "complete-todo"])).optional(),
+      },
+      (args) => safe(() => handleRegisterSession(args))
+    );
+    server.tool(
+      "next-todo",
+      "Claims and returns the oldest open todo bound to this session (identified by hostname+workingFolder+spaceId), with its body as Markdown. Returns {todo:null} when nothing is queued.",
+      { spaceId: z.string().min(1), hostname: z.string().min(1), workingFolder: z.string().min(1) },
+      (args) => safe(() => handleNextTodo(args))
+    );
+    server.tool(
+      "update-todo",
+      "Writes the body of the todo your session currently has claimed, from Markdown (code blocks supported). mode 'append' (default) preserves the original and adds an answer block; 'replace' overwrites.",
+      {
+        sessionId: z.string().min(1),
+        spaceId: z.string().min(1),
+        todoId: z.string().min(1),
+        bodyMarkdown: z.string(),
+        mode: z.enum(["append", "replace"]).optional(),
+      },
+      (args) => safe(() => handleUpdateTodo(args))
+    );
+    server.tool(
+      "handoff",
+      "Hands the claimed todo back to the human (keeps it open) and releases the claim.",
+      { sessionId: z.string().min(1), spaceId: z.string().min(1), todoId: z.string().min(1) },
+      (args) => safe(() => handleHandoff(args))
     );
   },
   { serverInfo: { name: "aido-mcp-server", version: "0.2.0" } },
