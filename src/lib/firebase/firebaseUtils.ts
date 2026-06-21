@@ -30,7 +30,7 @@ import {
 } from "firebase/firestore";
 import { getSpaceColor } from "../theme/colors";
 import { deriveTags, deriveMentions, extractPlainText, type MentionMember } from "../utils/textUtils";
-import type { Space, Todo, Daily, TiptapContent } from "../types";
+import type { Space, Todo, Daily, TiptapContent, AgentSession, AgentToolName } from "../types";
 // Auth functions
 export const logoutUser = () => signOut(auth);
 
@@ -337,6 +337,83 @@ export const moveTodoToSpace = async (
   await batch.commit();
   return targetRef.id;
 };
+
+// --- Agent-Sessions (epic #212, issue #217) ---
+// Binding a todo to a Claude-Code session is a normal member update on the todo
+// doc; managing the session docs is owner-only under users/{uid}/sessions.
+
+// Attach a todo to a session (sets it to "bei aido"). Clears any stale claim.
+export const attachTodoToSession = (
+  spaceId: string,
+  todoId: string,
+  sessionId: string,
+  uid: string
+) =>
+  updateDoc(todoRef(spaceId, todoId), {
+    attachedSession: sessionId,
+    aidoTurn: "aido",
+    claimedBy: null,
+    claimedAt: null,
+    modifiedBy: uid,
+  });
+
+// Remove the binding entirely.
+export const detachTodoSession = (spaceId: string, todoId: string, uid: string) =>
+  updateDoc(todoRef(spaceId, todoId), {
+    attachedSession: null,
+    aidoTurn: null,
+    claimedBy: null,
+    claimedAt: null,
+    modifiedBy: uid,
+  });
+
+// "Zurück an aido": re-queue a handed-off (aidoTurn='user') todo for the session.
+export const returnTodoToAido = (spaceId: string, todoId: string, uid: string) =>
+  updateDoc(todoRef(spaceId, todoId), { aidoTurn: "aido", modifiedBy: uid });
+
+const sessionsCol = (uid: string) => collection(db, "users", uid, "sessions");
+const sessionRef = (uid: string, sessionId: string) => doc(db, "users", uid, "sessions", sessionId);
+
+const mapAgentSession = (d: QueryDocumentSnapshot<DocumentData>): AgentSession => {
+  const data = d.data();
+  return {
+    id: d.id,
+    spaceId: typeof data.spaceId === "string" ? data.spaceId : "",
+    hostname: typeof data.hostname === "string" ? data.hostname : "",
+    workingFolder: typeof data.workingFolder === "string" ? data.workingFolder : "",
+    label: typeof data.label === "string" ? data.label : null,
+    allowedTools: Array.isArray(data.allowedTools) ? (data.allowedTools as AgentToolName[]) : [],
+    leaseTtlSeconds: typeof data.leaseTtlSeconds === "number" ? data.leaseTtlSeconds : 600,
+    createdAt: data.createdAt ?? null,
+    lastSeenAt: data.lastSeenAt ?? null,
+  };
+};
+
+// Live list of the user's agent sessions for one space (for the attach picker /
+// settings panel). Single-field `where` — no composite index needed.
+export const subscribeAgentSessionsForSpace = (
+  uid: string,
+  spaceId: string,
+  onChange: (sessions: AgentSession[]) => void,
+  onError?: (e: Error) => void
+): Unsubscribe =>
+  onSnapshot(
+    query(sessionsCol(uid), where("spaceId", "==", spaceId)),
+    (snap) => onChange(snap.docs.map(mapAgentSession)),
+    (err) => onError?.(err)
+  );
+
+export const renameAgentSession = (uid: string, sessionId: string, label: string) =>
+  updateDoc(sessionRef(uid, sessionId), { label: label.trim() || null });
+
+export const deleteAgentSession = (uid: string, sessionId: string) =>
+  deleteDoc(sessionRef(uid, sessionId));
+
+export const setAgentSessionConfig = (
+  uid: string,
+  sessionId: string,
+  config: { allowedTools?: AgentToolName[]; leaseTtlSeconds?: number }
+) => updateDoc(sessionRef(uid, sessionId), { ...config });
 
 // --- Daily "Heute" items (space-scoped, issue #41) ---
 // Short-lived items, deliberately separate from todos (never appear in the list).

@@ -23,6 +23,9 @@ import {
   setTodoStatus,
   deleteTodo,
   moveTodoToSpace,
+  attachTodoToSession,
+  detachTodoSession,
+  returnTodoToAido,
 } from "@/lib/firebase/firebaseUtils";
 import type { MentionMember } from "@/lib/utils/textUtils";
 import type { Todo, TiptapContent } from "@/lib/types";
@@ -59,6 +62,12 @@ interface TodosContextType {
    * when the target doesn't have that member.
    */
   moveTodo: (id: string, targetSpaceId: string) => Promise<boolean>;
+  /** Agent-Sessions (epic #212): bind a todo to a session ("bei aido"). */
+  attachToSession: (id: string, sessionId: string) => Promise<void>;
+  /** Remove a todo's session binding. */
+  detachSession: (id: string) => Promise<void>;
+  /** Re-queue a handed-off todo for the session ("Zurück an aido"). */
+  returnToAido: (id: string) => Promise<void>;
 }
 
 const TodosContext = createContext<TodosContextType | undefined>(undefined);
@@ -294,6 +303,45 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
     [user, todos, spaces, showToast, showError]
   );
 
+  const attachToSession = useCallback(
+    async (id: string, sessionId: string) => {
+      if (!activeSpaceId || !user) return;
+      try {
+        await attachTodoToSession(activeSpaceId, id, sessionId, user.uid);
+      } catch (e) {
+        console.error("attachToSession failed", e);
+        showError("An Agent-Session anhängen fehlgeschlagen.");
+      }
+    },
+    [activeSpaceId, user, showError]
+  );
+
+  const detachSession = useCallback(
+    async (id: string) => {
+      if (!activeSpaceId || !user) return;
+      try {
+        await detachTodoSession(activeSpaceId, id, user.uid);
+      } catch (e) {
+        console.error("detachSession failed", e);
+        showError("Lösen der Agent-Session fehlgeschlagen.");
+      }
+    },
+    [activeSpaceId, user, showError]
+  );
+
+  const returnToAido = useCallback(
+    async (id: string) => {
+      if (!activeSpaceId || !user) return;
+      try {
+        await returnTodoToAido(activeSpaceId, id, user.uid);
+      } catch (e) {
+        console.error("returnToAido failed", e);
+        showError("Zurück an aido fehlgeschlagen.");
+      }
+    },
+    [activeSpaceId, user, showError]
+  );
+
   const value: TodosContextType = {
     todos,
     loading,
@@ -310,6 +358,9 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
     setStatus,
     remove,
     moveTodo,
+    attachToSession,
+    detachSession,
+    returnToAido,
   };
 
   return <TodosContext.Provider value={value}>{children}</TodosContext.Provider>;
