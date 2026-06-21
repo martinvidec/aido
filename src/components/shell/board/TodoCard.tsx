@@ -14,6 +14,15 @@ interface TodoCardProps {
   nameOf: (uid: string) => string;
   draggable?: boolean;
   onDragStart?: () => void;
+  /**
+   * Intra-column reordering (issue #237): drag-over / drop on this card, plus a
+   * line showing where the dragged card would land. Wired only by the desktop
+   * board for same-column cards; cross-column drops bubble to the column
+   * (status/person change) untouched.
+   */
+  onReorderOver?: (e: React.DragEvent<HTMLElement>) => void;
+  onReorderDrop?: (e: React.DragEvent<HTMLElement>) => void;
+  dropHint?: "above" | "below" | null;
   /** Mobile: open the column "Verschieben" sheet for this card. */
   onMove?: () => void;
   /** Open the "In Space" target-space picker for this card (issue #202). */
@@ -23,7 +32,7 @@ interface TodoCardProps {
 }
 
 /** Board card (issue #46): title + progress + "bei X" chip + check circle. */
-export default function TodoCard({ todo, accent, nameOf, draggable, onDragStart, onMove, onMoveToSpace, onAttach }: TodoCardProps) {
+export default function TodoCard({ todo, accent, nameOf, draggable, onDragStart, onReorderOver, onReorderDrop, dropHint, onMove, onMoveToSpace, onAttach }: TodoCardProps) {
   const { setCompleted } = useTodos();
   const progress = checklistProgress(todo.body);
 
@@ -31,9 +40,26 @@ export default function TodoCard({ todo, accent, nameOf, draggable, onDragStart,
     <div
       draggable={draggable}
       onDragStart={onDragStart}
-      className="flex flex-col gap-2 bg-bg-card p-3 shadow-soft"
+      onDragOver={onReorderOver}
+      onDrop={onReorderDrop}
+      className="relative flex flex-col gap-2 bg-bg-card p-3 shadow-soft"
       style={{ borderRadius: 12, cursor: draggable ? "grab" : undefined }}
     >
+      {dropHint && (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: 6,
+            right: 6,
+            height: 3,
+            borderRadius: 2,
+            background: accent,
+            top: dropHint === "above" ? -2 : undefined,
+            bottom: dropHint === "below" ? -2 : undefined,
+          }}
+        />
+      )}
       <div className="flex items-start gap-2">
         <button
           type="button"
