@@ -29,9 +29,11 @@ Responsive by design: a desktop shell (sidebar + scrolling column) and a dedicat
 - **Personal API key** (`aido_…`): generate / rotate / revoke for external integrations (e.g. Claude Code/Desktop). The plaintext is shown exactly once; only a SHA-256 hash is stored (`userApiKeys/{uid}`, admin-only). Requires `FIREBASE_SERVICE_ACCOUNT_KEY`.
 
 ### MCP server (`/api/mcp/sse`)
-Model Context Protocol over **streamable HTTP**, stateless via [`mcp-handler`](https://www.npmjs.com/package/mcp-handler) (serverless-friendly — no in-memory session map). **10 Firestore-backed tools**, all member-gated and scoped to the caller's uid:
+Model Context Protocol over **streamable HTTP**, stateless via [`mcp-handler`](https://www.npmjs.com/package/mcp-handler) (serverless-friendly — no in-memory session map). **14 Firestore-backed tools**, all member-gated and scoped to the caller's uid:
 
 `list-spaces` · `list-todos` · `add-todo` · `complete-todo` · `set-waiting-on` · `list-daily` · `add-daily` · `delete-todo` · `whoami` · `list-members`
+
+…plus the **Agent-Sessions** work loop (epic #212): `register-session` · `next-todo` · `update-todo` · `handoff`.
 
 Three authentication methods on the same endpoint:
 - the shared `MCP_AUTH_TOKEN` (transport only — data tools require a user identity),
@@ -43,6 +45,13 @@ Quickstart with Claude Code:
 claude mcp add --transport http aido https://<your-app>/api/mcp/sse \
   --header "Authorization: Bearer aido_<your-key>"
 ```
+
+**Let Claude work off your todos (Agent-Sessions, epic #212).** Assign a todo to a running Claude-Code session and have it answer in place — even without closing it:
+1. In the session, call `register-session` once with your hostname + working folder (returns a `sessionId`).
+2. In the aido web UI, attach todos to that session ("An Agent-Session anhängen …").
+3. In the session, loop: `next-todo` (claims the oldest attached todo, body as Markdown) → `update-todo` (answer in Markdown, incl. code blocks) → `handoff` (back to you, still open) **or** `complete-todo`.
+
+A **claim + lease** stops the same todo being picked up endlessly; a per-session **allowlist** (default: answer + handoff, *not* complete) and **scope to the claimed todo** bound what the loop can do. Manage sessions, allowlists and the lease in **Settings → Agent-Sessions**. No extra env var — this uses your personal API key.
 
 ### OAuth (claude.ai connector)
 aido is its own **OAuth Authorization Server** for the MCP resource server, reusing the existing Google login for consent:
