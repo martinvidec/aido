@@ -415,6 +415,22 @@ export const setAgentSessionConfig = (
   config: { allowedTools?: AgentToolName[]; leaseTtlSeconds?: number }
 ) => updateDoc(sessionRef(uid, sessionId), { ...config });
 
+// All of the user's agent sessions (for the settings panel, #219).
+export const subscribeAllAgentSessions = (
+  uid: string,
+  onChange: (sessions: AgentSession[]) => void,
+  onError?: (e: Error) => void
+): Unsubscribe =>
+  onSnapshot(
+    sessionsCol(uid),
+    (snap) => onChange(snap.docs.map(mapAgentSession)),
+    (err) => onError?.(err)
+  );
+
+// Default lease (seconds) applied to newly registered sessions (#219, #215).
+export const setUserAgentDefaults = (uid: string, defaults: { leaseTtlSeconds: number }) =>
+  updateDoc(doc(db, "users", uid), { agentSessionDefaults: defaults });
+
 // --- Daily "Heute" items (space-scoped, issue #41) ---
 // Short-lived items, deliberately separate from todos (never appear in the list).
 
