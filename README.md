@@ -50,29 +50,26 @@ claude mcp add --transport http aido https://<your-app>/api/mcp/sse \
 **Let Claude work off your todos (Agent-Sessions, epic #212).** Assign a todo to a running Claude-Code session and have it answer in place — even without closing it:
 1. In the session, call `register-session` once with your hostname + working folder (returns a `sessionId`).
 2. In the aido web UI, attach todos to that session ("An Agent-Session anhängen …").
-3. In the session, loop: `next-todo` (claims the oldest attached todo, body as Markdown) → `update-todo` (answer in Markdown, incl. code blocks) → `handoff` (back to you, still open) **or** `complete-todo`.
+3. In the session, loop: `next-todo` (claims the oldest attached todo, body as Markdown) → `update-todo` (answer in Markdown, incl. code blocks) → `handoff` (back to you, open — releases the binding) **or** `complete-todo`. (To have the agent work it again, just re-attach it.)
 
 A **claim + lease** stops the same todo being picked up endlessly; a per-session **allowlist** (default: answer + handoff, *not* complete) and **scope to the claimed todo** bound what the loop can do. Manage sessions, allowlists and the lease in **Settings → Agent-Sessions**. No extra env var — this uses your personal API key.
 
-A todo bound to a session moves through this lifecycle — it only returns to the queue on a human turn or an expired lease, so the loop never re-picks the same item:
+A todo bound to a session moves through this lifecycle — a claim leaves the queue immediately, and **handing it back or completing it releases the binding** (the todo is then no longer assigned to any session), so the loop never re-picks the same item:
 
 ```mermaid
 stateDiagram-v2
     state "nicht gebunden" as Frei
     state "bei aido" as Aido
     state "in Arbeit" as InArbeit
-    state "bei dir" as User
     state "erledigt" as Done
 
     [*] --> Frei
     Frei --> Aido: attach (UI)
     Aido --> InArbeit: next-todo (claim + lease)
-    InArbeit --> User: handoff (bleibt offen)
+    InArbeit --> Frei: handoff (offen, zurück an dich)
     InArbeit --> Done: complete-todo
     InArbeit --> Aido: Lease abgelaufen
-    User --> Aido: Zurück an aido (User)
     Aido --> Frei: Lösen (UI)
-    User --> Frei: Lösen (UI)
     Done --> [*]
 ```
 

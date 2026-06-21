@@ -25,7 +25,6 @@ import {
   moveTodoToSpace,
   attachTodoToSession,
   detachTodoSession,
-  returnTodoToAido,
 } from "@/lib/firebase/firebaseUtils";
 import type { MentionMember } from "@/lib/utils/textUtils";
 import type { Todo, TiptapContent } from "@/lib/types";
@@ -66,8 +65,6 @@ interface TodosContextType {
   attachToSession: (id: string, sessionId: string) => Promise<void>;
   /** Remove a todo's session binding. */
   detachSession: (id: string) => Promise<void>;
-  /** Re-queue a handed-off todo for the session ("Zurück an aido"). */
-  returnToAido: (id: string) => Promise<void>;
 }
 
 const TodosContext = createContext<TodosContextType | undefined>(undefined);
@@ -329,19 +326,6 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
     [activeSpaceId, user, showError]
   );
 
-  const returnToAido = useCallback(
-    async (id: string) => {
-      if (!activeSpaceId || !user) return;
-      try {
-        await returnTodoToAido(activeSpaceId, id, user.uid);
-      } catch (e) {
-        console.error("returnToAido failed", e);
-        showError("Zurück an aido fehlgeschlagen.");
-      }
-    },
-    [activeSpaceId, user, showError]
-  );
-
   const value: TodosContextType = {
     todos,
     loading,
@@ -360,7 +344,6 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
     moveTodo,
     attachToSession,
     detachSession,
-    returnToAido,
   };
 
   return <TodosContext.Provider value={value}>{children}</TodosContext.Provider>;
