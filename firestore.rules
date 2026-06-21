@@ -146,7 +146,26 @@ service cloud.firestore {
               && request.resource.data.spaceId == spaceId
               && (!('body' in request.resource.data)
                   || request.resource.data.body == null
-                  || request.resource.data.body is map);
+                  || request.resource.data.body is map)
+              // Agent-Sessions (issue #213, epic #212): binding + turn + claim/
+              // lease fields. The MCP server sets claimedBy/claimedAt/lastAidoEditAt
+              // via the Admin SDK (past these rules); the shape-checks here keep a
+              // later client merge-update (which re-validates the full doc) valid.
+              && (!('attachedSession' in request.resource.data)
+                  || request.resource.data.attachedSession == null
+                  || request.resource.data.attachedSession is string)
+              && (!('aidoTurn' in request.resource.data)
+                  || request.resource.data.aidoTurn == null
+                  || request.resource.data.aidoTurn in ['aido', 'user'])
+              && (!('claimedBy' in request.resource.data)
+                  || request.resource.data.claimedBy == null
+                  || request.resource.data.claimedBy is string)
+              && (!('claimedAt' in request.resource.data)
+                  || request.resource.data.claimedAt == null
+                  || request.resource.data.claimedAt is timestamp)
+              && (!('lastAidoEditAt' in request.resource.data)
+                  || request.resource.data.lastAidoEditAt == null
+                  || request.resource.data.lastAidoEditAt is timestamp);
         }
 
         allow read: if isMemberOfThisSpace();
@@ -200,6 +219,14 @@ service cloud.firestore {
       // Owner-only: contains PII (email, timezone, notification settings)
       allow read: if isOwner(userId);
       allow write: if isOwner(userId); // Owner can write their own user doc
+
+      // Agent-Sessions (issue #213, epic #212): a running Claude-Code session
+      // bound to one space. Owner-only — the owner reads them for the attach
+      // picker and edits label/allowedTools/leaseTtlSeconds in settings; the MCP
+      // server writes them via the Admin SDK (which bypasses these rules).
+      match /sessions/{sessionId} {
+        allow read, write, delete: if isOwner(userId);
+      }
 
       // Reads on todos are governed solely by the collection group rule below
       // (/{path=**}/todos/{todoId}) — it also matches direct document reads.

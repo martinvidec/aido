@@ -57,6 +57,23 @@ export interface Todo {
    * so it is set once and not mutated afterwards.
    */
   order: number;
+  /**
+   * Agent-Sessions (epic #212): the Claude-Code session this todo is bound to
+   * (a sessionId under `users/{uid}/sessions`), or null. Set/cleared only via
+   * the web UI; the MCP session tools never change the binding.
+   */
+  attachedSession: string | null;
+  /**
+   * Whose turn it is while attached: `aido` = queued for the session to pick up,
+   * `user` = the session handed it back (still open). null when not attached.
+   */
+  aidoTurn: "aido" | "user" | null;
+  /** sessionId currently holding the claim (`next-todo`), or null. */
+  claimedBy: string | null;
+  /** When the claim was taken; basis for the lease (see `leaseTtlSeconds`). */
+  claimedAt: Timestamp | null;
+  /** Last time a session wrote the body — drives the "von aido" marker. */
+  lastAidoEditAt: Timestamp | null;
 }
 
 /**
@@ -74,4 +91,31 @@ export interface Daily {
   /** userId of the author; immutable after creation. */
   author: string;
   createdAt: Timestamp | null;
+}
+
+/** Tool actions a session may perform; enforced server-side by the MCP layer. */
+export type AgentToolName = "update-todo" | "handoff" | "complete-todo";
+
+/**
+ * Agent-Session (epic #212) — a running Claude-Code session bound to ONE space,
+ * stored owner-only at `users/{uid}/sessions/{sessionId}` (the id is derived
+ * deterministically from spaceId+hostname+workingFolder). Deliberately named
+ * "Agent-Session" to avoid confusion with the device-/login sessions.
+ */
+export interface AgentSession {
+  /** Firestore document id = sha256(spaceId|hostname|workingFolder). */
+  id: string;
+  /** The single space this session works in. */
+  spaceId: string;
+  hostname: string;
+  workingFolder: string;
+  /** Optional human label shown in the attach picker. */
+  label: string | null;
+  /** Actions this session may perform; default `['update-todo','handoff']`. */
+  allowedTools: AgentToolName[];
+  /** Claim lease in seconds; default from the user's `agentSessionDefaults`. */
+  leaseTtlSeconds: number;
+  createdAt: Timestamp | null;
+  /** Heartbeat: refreshed by `register-session` and `next-todo`. */
+  lastSeenAt: Timestamp | null;
 }

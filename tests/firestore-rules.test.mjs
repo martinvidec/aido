@@ -484,6 +484,45 @@ await check('user may not query deviceLoginCodes', assertFails(
   getDocs(query(collection(db(ALICE), 'deviceLoginCodes'),
     where('userCode', '==', 'WDJBMJHT')))));
 
+console.log('Agent-Sessions collection (issue #213, epic #212):');
+const SESSION_PATH = `users/${ALICE}/sessions/sess-1`;
+const seedSession = {
+  spaceId: TS, hostname: 'macbook', workingFolder: '/home/alice/proj',
+  label: null, allowedTools: ['update-todo', 'handoff'], leaseTtlSeconds: 600,
+};
+await check('owner may create their own agent session', assertSucceeds(
+  setDoc(doc(db(ALICE), SESSION_PATH), seedSession)));
+await check('owner may read their own agent session', assertSucceeds(
+  getDoc(doc(db(ALICE), SESSION_PATH))));
+await check('owner may edit session config (label/leaseTtlSeconds)', assertSucceeds(
+  updateDoc(doc(db(ALICE), SESSION_PATH), { label: 'Laptop', leaseTtlSeconds: 1200 })));
+await check('other user may not read a foreign agent session', assertFails(
+  getDoc(doc(db(BOB), SESSION_PATH))));
+await check('other user may not create a foreign agent session', assertFails(
+  setDoc(doc(db(BOB), `users/${ALICE}/sessions/sess-x`), seedSession)));
+await check('owner may delete their own agent session', assertSucceeds(
+  deleteDoc(doc(db(ALICE), SESSION_PATH))));
+
+console.log('Agent-Session todo fields (issue #213, epic #212):');
+await resetSpaceTodos();
+await check('member may bind a todo to a session (attachedSession + aidoTurn)', assertSucceeds(
+  updateDoc(doc(db(ALICE), TODO2_PATH), {
+    attachedSession: 'sess-1', aidoTurn: 'aido', modifiedBy: ALICE })));
+await check('member may set claim fields (claimedBy + claimedAt timestamp)', assertSucceeds(
+  updateDoc(doc(db(ALICE), TODO2_PATH), {
+    claimedBy: 'sess-1', claimedAt: new Date(), modifiedBy: ALICE })));
+await check('member may clear the binding (nulls)', assertSucceeds(
+  updateDoc(doc(db(ALICE), TODO2_PATH), {
+    attachedSession: null, aidoTurn: null, claimedBy: null, claimedAt: null, modifiedBy: ALICE })));
+await check('member may not set an invalid aidoTurn', assertFails(
+  updateDoc(doc(db(ALICE), TODO2_PATH), { aidoTurn: 'maybe', modifiedBy: ALICE })));
+await check('member may not set a non-string attachedSession', assertFails(
+  updateDoc(doc(db(ALICE), TODO2_PATH), { attachedSession: 42, modifiedBy: ALICE })));
+await check('member may not set a non-string claimedBy', assertFails(
+  updateDoc(doc(db(ALICE), TODO2_PATH), { claimedBy: 42, modifiedBy: ALICE })));
+await check('member may not set a non-timestamp claimedAt', assertFails(
+  updateDoc(doc(db(ALICE), TODO2_PATH), { claimedAt: 'soon', modifiedBy: ALICE })));
+
 await testEnv.cleanup();
 
 if (failures > 0) {
