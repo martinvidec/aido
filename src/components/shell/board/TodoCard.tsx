@@ -5,6 +5,7 @@ import { useTodos } from "@/lib/contexts/TodosContext";
 import { checklistProgress } from "@/lib/utils/checklist";
 import Avatar from "../Avatar";
 import TokenizedText from "../TokenizedText";
+import StatusBadge from "../StatusBadge";
 import type { Todo } from "@/lib/types";
 
 interface TodoCardProps {
@@ -17,10 +18,12 @@ interface TodoCardProps {
   onMove?: () => void;
   /** Open the "In Space" target-space picker for this card (issue #202). */
   onMoveToSpace?: () => void;
+  /** Open the "An Agent-Session anhängen" picker for this card (issue #218). */
+  onAttach?: () => void;
 }
 
 /** Board card (issue #46): title + progress + "bei X" chip + check circle. */
-export default function TodoCard({ todo, accent, nameOf, draggable, onDragStart, onMove, onMoveToSpace }: TodoCardProps) {
+export default function TodoCard({ todo, accent, nameOf, draggable, onDragStart, onMove, onMoveToSpace, onAttach }: TodoCardProps) {
   const { setCompleted } = useTodos();
   const progress = checklistProgress(todo.body);
 
@@ -51,7 +54,7 @@ export default function TodoCard({ todo, accent, nameOf, draggable, onDragStart,
         </span>
       </div>
 
-      {(progress.total > 0 || todo.waitingOn) && (
+      {(progress.total > 0 || todo.waitingOn || todo.attachedSession) && (
         <div className="flex flex-wrap items-center gap-2 pl-7">
           {todo.waitingOn && (
             <span className="flex items-center gap-1 text-xs text-text-dim">
@@ -63,11 +66,22 @@ export default function TodoCard({ todo, accent, nameOf, draggable, onDragStart,
               {progress.done}/{progress.total}
             </span>
           )}
+          <StatusBadge todo={todo} />
         </div>
       )}
 
-      {(onMove || onMoveToSpace) && (
+      {(onMove || onMoveToSpace || onAttach) && (
         <div className="flex flex-wrap justify-end gap-2">
+          {onAttach && (
+            <button
+              type="button"
+              onClick={onAttach}
+              className="rounded-full border border-border px-3 py-1 text-xs font-semibold"
+              style={{ minHeight: 32 }}
+            >
+              An Session
+            </button>
+          )}
           {onMove && (
             <button
               type="button"

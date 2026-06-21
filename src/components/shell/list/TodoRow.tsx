@@ -8,6 +8,7 @@ import TodoTitle from "./TodoTitle";
 import TodoBody from "./TodoBody";
 import TodoEditor from "./TodoEditor";
 import TodoActions from "./TodoActions";
+import StatusBadge from "../StatusBadge";
 import { checklistProgress } from "@/lib/utils/checklist";
 import type { Todo } from "@/lib/types";
 
@@ -80,7 +81,7 @@ export default function TodoRow({ todo, nameOf, variant = "desktop", onOpenActio
           onClick={() => hasBody && setExpanded((e) => !e)}
         >
           <TodoTitle title={todo.title} completed={todo.completed} />
-          {(todo.waitingOn || progress.total > 0) && (
+          {(todo.waitingOn || progress.total > 0 || todo.attachedSession) && (
             <div className="mt-1 flex flex-wrap items-center gap-2">
               {todo.waitingOn && (
                 <span
@@ -95,6 +96,7 @@ export default function TodoRow({ todo, nameOf, variant = "desktop", onOpenActio
                   {progress.done}/{progress.total}
                 </span>
               )}
+              <StatusBadge todo={todo} />
             </div>
           )}
         </div>

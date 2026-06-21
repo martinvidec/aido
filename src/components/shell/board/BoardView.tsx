@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useSpaces } from "@/lib/contexts/SpacesContext";
 import BottomSheet from "../BottomSheet";
 import MoveToSpaceMenu from "../MoveToSpaceMenu";
+import AttachToSessionMenu from "../AttachToSessionMenu";
 import BoardGroupToggle from "./BoardGroupToggle";
 import ColumnHeader from "./ColumnHeader";
 import TodoCard from "./TodoCard";
@@ -22,6 +23,7 @@ export default function BoardView() {
   // picker to move to another space (issue #202). All board todos are in the
   // active space, so "another space exists" is global.
   const [moveSpaceCard, setMoveSpaceCard] = useState<Todo | null>(null);
+  const [attachCard, setAttachCard] = useState<Todo | null>(null);
   const canMoveToSpace = spaces.length > 1;
 
   const onDrop = async (col: BoardColumn) => {
@@ -76,6 +78,7 @@ export default function BoardView() {
                   draggable
                   onDragStart={() => setDragId(t.id)}
                   onMoveToSpace={canMoveToSpace ? () => setMoveSpaceCard(t) : undefined}
+                  onAttach={() => setAttachCard(t)}
                 />
               ))}
               {col.todos.length === 0 && col.apply && (
@@ -97,6 +100,16 @@ export default function BoardView() {
             nameOf={nameOf}
             onDone={() => setMoveSpaceCard(null)}
           />
+        )}
+      </BottomSheet>
+
+      <BottomSheet
+        open={!!attachCard}
+        onClose={() => setAttachCard(null)}
+        title="An Agent-Session anhängen"
+      >
+        {attachCard && (
+          <AttachToSessionMenu todo={attachCard} onDone={() => setAttachCard(null)} />
         )}
       </BottomSheet>
     </div>
