@@ -84,6 +84,15 @@ When a spec (e.g. the `docs/0X-*.md` flow from the `concept-analysis-spec` skill
 - **Documentation-only changes may be merged immediately, without waiting for green CI.** This covers Markdown/docs, the `docs/` folder, README, comments — anything that does not affect application code or build output.
 - For code changes, wait for the Vercel check to be green before merging.
 
+### Merging stacked PRs (Epic sub-issues)
+
+When an Epic's sub-issues ship as **stacked** PRs (each branched off the previous feature branch, not `main`), do **not** just `gh pr merge <parent> --squash --delete-branch` down the stack. Deleting a stacked PR's base branch does **not** reliably auto-retarget its child — GitHub may **close** the child, and a closed PR whose base branch is gone cannot be reopened or retargeted (`Cannot change the base branch of a closed pull request`). Squash also leaves children `CONFLICTING` against `main` (the squashed parent is a new SHA).
+
+Do this instead:
+1. Before merging the bottom of the stack, retarget every higher child PR to `main` (`gh pr edit <n> --base main`) **while it is still OPEN**.
+2. After each merge to `main`, rebuild the next branch cleanly: `git checkout -B <branch> origin/main && git cherry-pick <that issue's single commit>` (our branches are one commit each), force-push, wait for green Vercel, merge. Each squash commit on `main` then contains exactly its own issue's diff.
+3. Recovery if a child already got closed: cherry-pick its commit onto `main` on a fresh branch, force-push, open a **new** PR (`Closes #<issue>` still works).
+
 ## Deployment
 
 The `firebase` CLI is **not installed globally** (a bare `firebase …` gives "command not found"). Prefix every Firebase command with `npx -y firebase-tools@13` — the same v13 pin the rules tests use (v15+ needs Java 21 / Node ≤22; this machine has Java 11 / Node 25). First-time auth: `npx -y firebase-tools@13 login`. The default project (`template-2-20926`) is set in `.firebaserc`.
