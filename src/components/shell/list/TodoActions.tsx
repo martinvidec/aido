@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useTodos } from "@/lib/contexts/TodosContext";
 import { useSpaces } from "@/lib/contexts/SpacesContext";
 import MoveToSpaceMenu from "../MoveToSpaceMenu";
+import AttachToSessionMenu from "../AttachToSessionMenu";
 import type { Todo } from "@/lib/types";
 
 /**
@@ -23,10 +24,11 @@ export default function TodoActions({
   onEdit: () => void;
   onClose: () => void;
 }) {
-  const { setWaitingOn, remove } = useTodos();
+  const { setWaitingOn, remove, returnToAido } = useTodos();
   const { activeSpace, spaces } = useSpaces();
   const [waitOpen, setWaitOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
   const members = activeSpace?.members ?? [];
 
   // FA-08: hide the move entry when there is nowhere to move the todo to.
@@ -102,6 +104,34 @@ export default function TodoActions({
             </div>
           )}
         </>
+      )}
+
+      {todo.aidoTurn === "user" && (
+        <button
+          type="button"
+          className={item}
+          style={{ minHeight: 44 }}
+          onClick={async () => {
+            await returnToAido(todo.id);
+            onClose();
+          }}
+        >
+          Zurück an aido
+        </button>
+      )}
+
+      <button
+        type="button"
+        className={`flex items-center justify-between ${item}`}
+        style={{ minHeight: 44 }}
+        onClick={() => setAttachOpen((o) => !o)}
+      >
+        An Agent-Session anhängen … <span className="text-text-dim">{attachOpen ? "⌄" : "›"}</span>
+      </button>
+      {attachOpen && (
+        <div className="border-l border-border pl-2">
+          <AttachToSessionMenu todo={todo} onDone={onClose} />
+        </div>
       )}
 
       <button
