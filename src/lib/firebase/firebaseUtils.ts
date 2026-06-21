@@ -176,6 +176,14 @@ const mapTodo = (d: QueryDocumentSnapshot<DocumentData>): Todo => {
           : "",
     createdAt: data.createdAt ?? null,
     order: typeof data.order === "number" ? data.order : 0,
+    // Agent-Sessions (epic #212): absent on todos that were never bound.
+    attachedSession:
+      typeof data.attachedSession === "string" ? data.attachedSession : null,
+    aidoTurn:
+      data.aidoTurn === "aido" || data.aidoTurn === "user" ? data.aidoTurn : null,
+    claimedBy: typeof data.claimedBy === "string" ? data.claimedBy : null,
+    claimedAt: data.claimedAt ?? null,
+    lastAidoEditAt: data.lastAidoEditAt ?? null,
   };
 };
 
