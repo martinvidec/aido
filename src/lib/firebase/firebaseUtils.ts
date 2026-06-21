@@ -30,6 +30,7 @@ import {
 } from "firebase/firestore";
 import { getSpaceColor } from "../theme/colors";
 import { deriveTags, deriveMentions, extractPlainText, type MentionMember } from "../utils/textUtils";
+import { ORDER_STEP } from "../utils/order";
 import type { Space, Todo, Daily, TiptapContent, AgentSession, AgentToolName } from "../types";
 // Auth functions
 export const logoutUser = () => signOut(auth);
@@ -301,6 +302,32 @@ export const setTodoStatus = (
     todoRef(spaceId, todoId),
     status.completed ? { ...status, ...releaseBinding, modifiedBy: uid } : { ...status, modifiedBy: uid }
   );
+
+// Manual reordering (issue #235, epic #234): set one todo's `order` to a
+// caller-computed value (the midpoint of its new neighbours — see utils/order).
+// One doc write; modifiedBy must be stamped for the rules (#198).
+export const setTodoOrder = (
+  spaceId: string,
+  todoId: string,
+  order: number,
+  uid: string
+) => updateDoc(todoRef(spaceId, todoId), { order, modifiedBy: uid });
+
+// Renumber a list of todos with clean, evenly spaced integers in one batch
+// (issue #235). Used when the neighbour gap got too small to subdivide, or to
+// heal legacy `order` ties (several todos sharing order 0). `orderedIds` is the
+// desired final order; every write stamps modifiedBy for the rules.
+export const normalizeTodoOrders = (
+  spaceId: string,
+  orderedIds: string[],
+  uid: string
+) => {
+  const batch = writeBatch(db);
+  orderedIds.forEach((id, i) =>
+    batch.update(todoRef(spaceId, id), { order: (i + 1) * ORDER_STEP, modifiedBy: uid })
+  );
+  return batch.commit();
+};
 
 export const deleteTodo = (spaceId: string, todoId: string) =>
   deleteDoc(todoRef(spaceId, todoId));

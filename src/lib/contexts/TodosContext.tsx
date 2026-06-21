@@ -23,9 +23,12 @@ import {
   setTodoStatus,
   deleteTodo,
   moveTodoToSpace,
+  setTodoOrder,
+  normalizeTodoOrders,
   attachTodoToSession,
   detachTodoSession,
 } from "@/lib/firebase/firebaseUtils";
+import { orderBetween } from "@/lib/utils/order";
 import type { MentionMember } from "@/lib/utils/textUtils";
 import type { Todo, TiptapContent } from "@/lib/types";
 
@@ -61,6 +64,14 @@ interface TodosContextType {
    * when the target doesn't have that member.
    */
   moveTodo: (id: string, targetSpaceId: string) => Promise<boolean>;
+  /**
+   * Manual reordering (issue #235, epic #234): move `movedId` to its new slot.
+   * `visibleOrderedIds` is the already-reordered list of the *visible* todos
+   * (it honours the active tag filter — only visible neighbours anchor the new
+   * `order`). Persists a single midpoint write, or renumbers when the gap is too
+   * tight or stored orders collide.
+   */
+  reorder: (movedId: string, visibleOrderedIds: string[]) => Promise<void>;
   /** Agent-Sessions (epic #212): bind a todo to a session ("bei aido"). */
   attachToSession: (id: string, sessionId: string) => Promise<void>;
   /** Remove a todo's session binding. */
@@ -300,6 +311,43 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
     [user, todos, spaces, showToast, showError]
   );
 
+  const reorder = useCallback(
+    async (movedId: string, visibleOrderedIds: string[]) => {
+      if (!activeSpaceId || !user) return;
+      const idx = visibleOrderedIds.indexOf(movedId);
+      if (idx === -1) return;
+      const byId = new Map(todos.map((t) => [t.id, t]));
+      const orderOf = (id: string | undefined): number | null =>
+        id ? byId.get(id)?.order ?? null : null;
+      // Anchor to the visible neighbours only, so reordering works (and stays
+      // intuitive) while a tag filter hides part of the list (FA-07).
+      const prevOrder = orderOf(visibleOrderedIds[idx - 1]);
+      const nextOrder = orderOf(visibleOrderedIds[idx + 1]);
+      const next = orderBetween(prevOrder, nextOrder);
+      try {
+        if (next !== null) {
+          await setTodoOrder(activeSpaceId, movedId, next, user.uid);
+          return;
+        }
+        // Gap too tight (or stored ties): renumber the whole open list with the
+        // move applied. Rebuild from the globally ordered open todos so the
+        // filtered-out ones keep their relative slots — insert moved before its
+        // visible successor (or at the end when it moved to the bottom).
+        const nextVisibleId = visibleOrderedIds[idx + 1];
+        const open = todos
+          .filter((t) => !t.completed && t.id !== movedId)
+          .map((t) => t.id);
+        const at = nextVisibleId ? open.indexOf(nextVisibleId) : -1;
+        open.splice(at < 0 ? open.length : at, 0, movedId);
+        await normalizeTodoOrders(activeSpaceId, open, user.uid);
+      } catch (e) {
+        console.error("reorder failed", e);
+        showError("Reihenfolge konnte nicht gespeichert werden.");
+      }
+    },
+    [activeSpaceId, user, todos, showError]
+  );
+
   const attachToSession = useCallback(
     async (id: string, sessionId: string) => {
       if (!activeSpaceId || !user) return;
@@ -342,6 +390,7 @@ export const TodosProvider = ({ children }: { children: ReactNode }) => {
     setStatus,
     remove,
     moveTodo,
+    reorder,
     attachToSession,
     detachSession,
   };

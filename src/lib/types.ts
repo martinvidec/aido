@@ -52,9 +52,11 @@ export interface Todo {
   modifiedBy: string;
   createdAt: Timestamp | null;
   /**
-   * Insertion order (`maxOrder + 1` at creation); drives the stable
-   * `orderBy("order","asc")` list/board sort. There is no manual reordering UI,
-   * so it is set once and not mutated afterwards.
+   * Sort key for the stable `orderBy("order","asc")` list/board sort. Set to
+   * `maxOrder + 1` at creation (new todos land at the end) and rewritten on
+   * manual reordering (issue #235, epic #234): a moved todo gets the midpoint of
+   * its new neighbours, so values may be fractional. `normalizeTodoOrders`
+   * renumbers to clean integers when a gap gets too small or ties appear.
    */
   order: number;
   /**
