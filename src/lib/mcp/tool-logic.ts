@@ -13,6 +13,10 @@ import {
   deleteTodo,
   whoami,
   listMembers,
+  registerSession,
+  nextTodo,
+  updateTodo,
+  handoffTodo,
 } from "./data";
 
 // Firestore-backed MCP tool handlers (issue #119). Each handler resolves the
@@ -90,10 +94,11 @@ export async function handleCompleteTodo(args: {
   spaceId: string;
   todoId: string;
   completed: boolean;
+  sessionId?: string;
 }): Promise<CallToolResult> {
   const uid = requireUserUid();
   enforceWriteRateLimit(uid);
-  return jsonResult(await completeTodo(uid, args.spaceId, args.todoId, args.completed));
+  return jsonResult(await completeTodo(uid, args.spaceId, args.todoId, args.completed, args.sessionId));
 }
 
 export async function handleSetWaitingOn(args: {
@@ -140,4 +145,52 @@ export async function handleWhoami(): Promise<CallToolResult> {
 export async function handleListMembers(args: { spaceId: string }): Promise<CallToolResult> {
   const uid = requireUserUid();
   return jsonResult(await listMembers(uid, args.spaceId));
+}
+
+// --- Agent-Sessions (epic #212, issue #216) ---
+
+export async function handleRegisterSession(args: {
+  spaceId: string;
+  hostname: string;
+  workingFolder: string;
+  label?: string;
+  allowedTools?: string[];
+}): Promise<CallToolResult> {
+  const uid = requireUserUid();
+  return jsonResult(await registerSession(uid, args));
+}
+
+// next-todo claims a todo (a write) but is the loop's polling mechanism, so it is
+// deliberately NOT subject to the write rate limit — only the content-mutating
+// tools below are (issue #216, NFA-06).
+export async function handleNextTodo(args: {
+  spaceId: string;
+  hostname: string;
+  workingFolder: string;
+}): Promise<CallToolResult> {
+  const uid = requireUserUid();
+  const todo = await nextTodo(uid, args);
+  return jsonResult({ todo });
+}
+
+export async function handleUpdateTodo(args: {
+  sessionId: string;
+  spaceId: string;
+  todoId: string;
+  bodyMarkdown: string;
+  mode?: "append" | "replace";
+}): Promise<CallToolResult> {
+  const uid = requireUserUid();
+  enforceWriteRateLimit(uid);
+  return jsonResult(await updateTodo(uid, args));
+}
+
+export async function handleHandoff(args: {
+  sessionId: string;
+  spaceId: string;
+  todoId: string;
+}): Promise<CallToolResult> {
+  const uid = requireUserUid();
+  enforceWriteRateLimit(uid);
+  return jsonResult(await handoffTodo(uid, args));
 }
