@@ -9,6 +9,7 @@ import { useTheme } from '@/lib/contexts/ThemeContext';
 import Image from 'next/image';
 import ApiKeySettings from './ApiKeySettings';
 import SessionSettings from './SessionSettings';
+import AgentSessionsSettings from './AgentSessionsSettings';
 
 interface UserSettingsState {
   displayName: string;
@@ -296,6 +297,8 @@ export default function UserSettings() {
         </div>
 
         <ApiKeySettings />
+
+        <AgentSessionsSettings />
 
         <SessionSettings />
 
