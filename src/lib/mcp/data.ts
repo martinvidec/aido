@@ -1,7 +1,10 @@
 import "server-only";
-import { FieldValue, type Firestore } from "firebase-admin/firestore";
+import { createHash } from "node:crypto";
+import { FieldValue, type Timestamp, type Firestore } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { deriveTags, deriveMentions, type MentionMember } from "@/lib/utils/textUtils";
+import { markdownToTiptap, tiptapToMarkdown, appendAnswer } from "@/lib/tiptap/markdown";
+import type { AgentToolName } from "@/lib/types";
 
 // Firestore-backed data access for the MCP tools (issue #118, epic #124).
 //
@@ -263,11 +266,15 @@ export async function addTodo(
   return mapTodoView(await ref.get());
 }
 
+// When `sessionId` is given (the agent loop completing its claimed todo, issue
+// #215), completion is additionally scoped to that session's claim + allowlist
+// and clears the claim. Without it, behaviour is unchanged (member-gated).
 export async function completeTodo(
   uid: string,
   spaceId: string,
   todoId: string,
-  completed: boolean
+  completed: boolean,
+  sessionId?: string
 ): Promise<TodoView> {
   await requireMember(uid, spaceId);
   if (!todoId) throw new McpToolError("invalid", "todoId is required.");
@@ -275,7 +282,17 @@ export async function completeTodo(
   const ref = db.collection("spaces").doc(spaceId).collection("todos").doc(todoId);
   const snap = await ref.get();
   if (!snap.exists) throw new McpToolError("not_found", `Todo ${todoId} not found.`);
-  await ref.update({ completed: !!completed, modifiedBy: uid });
+
+  const update: Record<string, unknown> = { completed: !!completed, modifiedBy: uid };
+  if (sessionId) {
+    const session = await requireSession(uid, sessionId);
+    if (session.spaceId !== spaceId) throw new McpToolError("invalid", "spaceId does not match the session.");
+    assertToolAllowed(session, "complete-todo");
+    requireClaim(snap.data()!, sessionId, session.leaseTtlSeconds);
+    update.claimedBy = null;
+    update.claimedAt = null;
+  }
+  await ref.update(update);
   return mapTodoView(await ref.get());
 }
 
@@ -386,4 +403,302 @@ export async function addDaily(uid: string, spaceId: string, text: string): Prom
     createdAt: FieldValue.serverTimestamp(),
   });
   return mapDailyView(await ref.get());
+}
+
+// --- Agent-Sessions (epic #212, issue #215) ---
+//
+// A session is bound to ONE space and stored owner-only at
+// users/{uid}/sessions/{sessionId}. The id is derived deterministically from
+// (spaceId, hostname, workingFolder) so any later MCP call can re-derive it from
+// the environment — the server stays stateless. The agent loop: register-session
+// → next-todo (claim, lease) → update-todo / handoff / complete-todo. Wirkung is
+// bounded by (1) scope to the claimed todo and (2) the per-session allowlist.
+
+const DEFAULT_ALLOWED_TOOLS: AgentToolName[] = ["update-todo", "handoff"];
+const ALL_AGENT_TOOLS: AgentToolName[] = ["update-todo", "handoff", "complete-todo"];
+const DEFAULT_LEASE_TTL_SECONDS = 600;
+
+export interface SessionData {
+  id: string;
+  spaceId: string;
+  hostname: string;
+  workingFolder: string;
+  label: string | null;
+  allowedTools: AgentToolName[];
+  leaseTtlSeconds: number;
+}
+
+export interface SessionSummary {
+  sessionId: string;
+  spaceId: string;
+  allowedTools: AgentToolName[];
+  leaseTtlSeconds: number;
+}
+
+export interface ClaimedTodo {
+  spaceId: string;
+  todoId: string;
+  title: string;
+  bodyMarkdown: string;
+  body: Record<string, unknown> | null;
+  tags: string[];
+  createdBy: string;
+  aidoTurn: "aido" | "user" | null;
+}
+
+export interface SessionTodoView extends TodoView {
+  attachedSession: string | null;
+  aidoTurn: "aido" | "user" | null;
+}
+
+function sessionIdFor(spaceId: string, hostname: string, workingFolder: string): string {
+  return createHash("sha256").update(`${spaceId}\n${hostname}\n${workingFolder}`).digest("hex");
+}
+
+function sanitizeTools(tools: unknown): AgentToolName[] | undefined {
+  if (!Array.isArray(tools)) return undefined;
+  return ALL_AGENT_TOOLS.filter((t) => tools.includes(t));
+}
+
+async function getUserLeaseDefault(db: Firestore, uid: string): Promise<number> {
+  const snap = await db.collection("users").doc(uid).get();
+  const v = snap.exists ? (snap.data()?.agentSessionDefaults?.leaseTtlSeconds as unknown) : undefined;
+  return typeof v === "number" && v > 0 ? v : DEFAULT_LEASE_TTL_SECONDS;
+}
+
+function mapSession(doc: FirebaseFirestore.DocumentSnapshot): SessionData {
+  const d = doc.data() ?? {};
+  return {
+    id: doc.id,
+    spaceId: typeof d.spaceId === "string" ? d.spaceId : "",
+    hostname: typeof d.hostname === "string" ? d.hostname : "",
+    workingFolder: typeof d.workingFolder === "string" ? d.workingFolder : "",
+    label: typeof d.label === "string" ? d.label : null,
+    allowedTools: sanitizeTools(d.allowedTools) ?? DEFAULT_ALLOWED_TOOLS,
+    leaseTtlSeconds: typeof d.leaseTtlSeconds === "number" ? d.leaseTtlSeconds : DEFAULT_LEASE_TTL_SECONDS,
+  };
+}
+
+// Loads the session (member of its space already implied at registration; the
+// per-call requireMember in the tools re-checks live membership).
+async function requireSession(uid: string, sessionId: string): Promise<SessionData> {
+  if (!sessionId) throw new McpToolError("invalid", "sessionId is required.");
+  const db = requireDb();
+  const snap = await db.collection("users").doc(uid).collection("sessions").doc(sessionId).get();
+  if (!snap.exists) throw new McpToolError("not_found", "Unknown session; call register-session first.");
+  return mapSession(snap);
+}
+
+function assertToolAllowed(session: SessionData, tool: AgentToolName): void {
+  if (!session.allowedTools.includes(tool)) {
+    throw new McpToolError("unauthorized", `Tool '${tool}' is not allowed for this session.`);
+  }
+}
+
+function leaseValid(claimedAt: unknown, leaseTtlSeconds: number, nowMs: number): boolean {
+  const ms = (claimedAt as Timestamp | null)?.toMillis?.();
+  return typeof ms === "number" && ms + leaseTtlSeconds * 1000 > nowMs;
+}
+
+// Scope gate for the mutating session tools: the todo must be attached to AND
+// currently claimed (valid lease) by the calling session — so a malicious todo
+// body cannot make the loop touch any OTHER todo (issue #215, FA-17).
+function requireClaim(d: FirebaseFirestore.DocumentData, sessionId: string, leaseTtlSeconds: number): void {
+  if (d.attachedSession !== sessionId) {
+    throw new McpToolError("unauthorized", "This todo is not attached to your session.");
+  }
+  if (d.claimedBy !== sessionId || !leaseValid(d.claimedAt, leaseTtlSeconds, Date.now())) {
+    throw new McpToolError("unauthorized", "This todo is not claimed by your session (claim expired?). Call next-todo first.");
+  }
+}
+
+function mapSessionTodoView(doc: FirebaseFirestore.DocumentSnapshot): SessionTodoView {
+  const base = mapTodoView(doc);
+  const d = doc.data() ?? {};
+  return {
+    ...base,
+    attachedSession: typeof d.attachedSession === "string" ? d.attachedSession : null,
+    aidoTurn: d.aidoTurn === "aido" || d.aidoTurn === "user" ? d.aidoTurn : null,
+  };
+}
+
+function claimedTodoView(spaceId: string, todoId: string, d: FirebaseFirestore.DocumentData): ClaimedTodo {
+  const body = (d.body ?? null) as Record<string, unknown> | null;
+  return {
+    spaceId,
+    todoId,
+    title: typeof d.title === "string" ? d.title : "",
+    bodyMarkdown: tiptapToMarkdown(body),
+    body,
+    tags: Array.isArray(d.tags) ? d.tags : [],
+    createdBy: typeof d.createdBy === "string" ? d.createdBy : "",
+    aidoTurn: d.aidoTurn === "aido" || d.aidoTurn === "user" ? d.aidoTurn : null,
+  };
+}
+
+// Upsert a space-bound session. First registration sets defaults; later calls
+// refresh lastSeenAt and may update label/allowedTools.
+export async function registerSession(
+  uid: string,
+  input: { spaceId: string; hostname: string; workingFolder: string; label?: string | null; allowedTools?: string[] }
+): Promise<SessionSummary> {
+  const hostname = (input.hostname ?? "").trim();
+  const workingFolder = (input.workingFolder ?? "").trim();
+  if (!hostname) throw new McpToolError("invalid", "hostname is required.");
+  if (!workingFolder) throw new McpToolError("invalid", "workingFolder is required.");
+  await requireMember(uid, input.spaceId);
+
+  const db = requireDb();
+  const sessionId = sessionIdFor(input.spaceId, hostname, workingFolder);
+  const ref = db.collection("users").doc(uid).collection("sessions").doc(sessionId);
+  const snap = await ref.get();
+
+  if (!snap.exists) {
+    const allowedTools = sanitizeTools(input.allowedTools) ?? DEFAULT_ALLOWED_TOOLS;
+    const leaseTtlSeconds = await getUserLeaseDefault(db, uid);
+    await ref.set({
+      spaceId: input.spaceId,
+      hostname,
+      workingFolder,
+      label: input.label ?? null,
+      allowedTools,
+      leaseTtlSeconds,
+      createdAt: FieldValue.serverTimestamp(),
+      lastSeenAt: FieldValue.serverTimestamp(),
+    });
+    return { sessionId, spaceId: input.spaceId, allowedTools, leaseTtlSeconds };
+  }
+
+  const update: Record<string, unknown> = { lastSeenAt: FieldValue.serverTimestamp() };
+  if (input.label !== undefined) update.label = input.label;
+  const tools = sanitizeTools(input.allowedTools);
+  if (tools !== undefined) update.allowedTools = tools;
+  await ref.set(update, { merge: true });
+
+  const merged = mapSession(await ref.get());
+  return {
+    sessionId,
+    spaceId: merged.spaceId,
+    allowedTools: merged.allowedTools,
+    leaseTtlSeconds: merged.leaseTtlSeconds,
+  };
+}
+
+// Claims and returns the oldest open todo bound to the caller's session, or null.
+// Per-space query (no collection-group); the claim is taken in a transaction so
+// two concurrent calls can never grab the same todo (NFA-03).
+export async function nextTodo(
+  uid: string,
+  input: { spaceId: string; hostname: string; workingFolder: string }
+): Promise<ClaimedTodo | null> {
+  await requireMember(uid, input.spaceId);
+  const sessionId = sessionIdFor(input.spaceId, (input.hostname ?? "").trim(), (input.workingFolder ?? "").trim());
+  const session = await requireSession(uid, sessionId);
+
+  const db = requireDb();
+  // Heartbeat — best-effort, must not fail the call.
+  db.collection("users").doc(uid).collection("sessions").doc(sessionId)
+    .update({ lastSeenAt: FieldValue.serverTimestamp() })
+    .catch(() => {});
+
+  const todosCol = db.collection("spaces").doc(input.spaceId).collection("todos");
+  const snap = await todosCol.where("attachedSession", "==", sessionId).get();
+  const nowMs = Date.now();
+  const leaseTtl = session.leaseTtlSeconds;
+
+  const open = snap.docs
+    .map((doc) => ({ id: doc.id, createdAt: doc.data().createdAt?.toMillis?.() ?? 0, d: doc.data() }))
+    .filter((r) => r.d.completed !== true && r.d.aidoTurn === "aido");
+
+  // Already claimed by this session → return it (idempotent within a lease).
+  const selfClaimed = open
+    .filter((r) => r.d.claimedBy === sessionId && leaseValid(r.d.claimedAt, leaseTtl, nowMs))
+    .sort((a, b) => a.createdAt - b.createdAt);
+  if (selfClaimed.length) {
+    return claimedTodoView(input.spaceId, selfClaimed[0].id, selfClaimed[0].d);
+  }
+
+  const free = open
+    .filter((r) => !r.d.claimedBy || !leaseValid(r.d.claimedAt, leaseTtl, nowMs))
+    .sort((a, b) => a.createdAt - b.createdAt);
+
+  for (const row of free) {
+    const ref = todosCol.doc(row.id);
+    let claimed = false;
+    try {
+      await db.runTransaction(async (tx) => {
+        const fresh = await tx.get(ref);
+        if (!fresh.exists) return;
+        const d = fresh.data()!;
+        if (d.completed === true || d.aidoTurn !== "aido" || d.attachedSession !== sessionId) return;
+        if (d.claimedBy && d.claimedBy !== sessionId && leaseValid(d.claimedAt, leaseTtl, nowMs)) return;
+        tx.update(ref, { claimedBy: sessionId, claimedAt: FieldValue.serverTimestamp(), modifiedBy: uid });
+        claimed = true;
+      });
+    } catch {
+      claimed = false;
+    }
+    if (claimed) {
+      return claimedTodoView(input.spaceId, row.id, (await ref.get()).data()!);
+    }
+  }
+  return null;
+}
+
+// Writes the body from Markdown (append default / replace). Scoped to the
+// claimed todo + allowlist; re-derives tags/mentions; never auto-hands-off.
+export async function updateTodo(
+  uid: string,
+  input: { sessionId: string; spaceId: string; todoId: string; bodyMarkdown: string; mode?: "append" | "replace" }
+): Promise<SessionTodoView> {
+  const session = await requireSession(uid, input.sessionId);
+  if (session.spaceId !== input.spaceId) throw new McpToolError("invalid", "spaceId does not match the session.");
+  assertToolAllowed(session, "update-todo");
+  const space = await requireMember(uid, input.spaceId);
+  if (!input.todoId) throw new McpToolError("invalid", "todoId is required.");
+
+  const db = requireDb();
+  const ref = db.collection("spaces").doc(input.spaceId).collection("todos").doc(input.todoId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new McpToolError("not_found", `Todo ${input.todoId} not found.`);
+  requireClaim(snap.data()!, input.sessionId, session.leaseTtlSeconds);
+
+  const existingBody = (snap.data()!.body ?? null) as Record<string, unknown> | null;
+  const mode = input.mode ?? "append";
+  const newBody =
+    mode === "replace"
+      ? markdownToTiptap(input.bodyMarkdown)
+      : appendAnswer(existingBody, input.bodyMarkdown, { at: new Date() });
+
+  const title = typeof snap.data()!.title === "string" ? (snap.data()!.title as string) : "";
+  const members = await loadMentionMembers(db, space.members);
+  await ref.update({
+    body: newBody,
+    tags: deriveTags(title, newBody),
+    mentions: deriveMentions(newBody, title, members),
+    modifiedBy: uid,
+    lastAidoEditAt: FieldValue.serverTimestamp(),
+  });
+  return mapSessionTodoView(await ref.get());
+}
+
+// Hands the todo back to the human (open, aidoTurn='user') and releases the claim.
+export async function handoffTodo(
+  uid: string,
+  input: { sessionId: string; spaceId: string; todoId: string }
+): Promise<SessionTodoView> {
+  const session = await requireSession(uid, input.sessionId);
+  if (session.spaceId !== input.spaceId) throw new McpToolError("invalid", "spaceId does not match the session.");
+  assertToolAllowed(session, "handoff");
+  await requireMember(uid, input.spaceId);
+  if (!input.todoId) throw new McpToolError("invalid", "todoId is required.");
+
+  const db = requireDb();
+  const ref = db.collection("spaces").doc(input.spaceId).collection("todos").doc(input.todoId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new McpToolError("not_found", `Todo ${input.todoId} not found.`);
+  requireClaim(snap.data()!, input.sessionId, session.leaseTtlSeconds);
+
+  await ref.update({ aidoTurn: "user", claimedBy: null, claimedAt: null, modifiedBy: uid });
+  return mapSessionTodoView(await ref.get());
 }
