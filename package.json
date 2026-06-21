@@ -15,7 +15,8 @@
     "test:mcp": "firebase emulators:exec --only firestore --project demo-mcp \"node --conditions=react-server --import tsx tests/mcp-tools.test.mts\"",
     "test:oauth": "firebase emulators:exec --only firestore,auth --project demo-oauth \"node --conditions=react-server --import tsx tests/oauth.test.mts\"",
     "test:device-login": "firebase emulators:exec --only firestore,auth --project demo-device-login \"node --conditions=react-server --import tsx tests/device-login.test.mts\"",
-    "migrate:legacy": "node scripts/migrate-legacy-todos-admin.mjs"
+    "migrate:legacy": "node scripts/migrate-legacy-todos-admin.mjs",
+    "test:markdown": "node --import tsx tests/markdown.test.mts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
@@ -39,6 +40,7 @@
     "firebase-admin": "^13.10.0",
     "framer-motion": "^11.3.31",
     "lucide-react": "^0.436.0",
+    "markdown-it": "^14.2.0",
     "mcp-handler": "^1.1.0",
     "next": "^15.5.19",
     "node-mocks-http": "^1.17.2",
@@ -55,6 +57,7 @@
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.1",
     "@playwright/cli": "^0.1.13",
+    "@types/markdown-it": "^14.1.2",
     "@types/qrcode": "^1.5.6",
     "eslint": "8.57.0",
     "eslint-config-next": "^15.5.19",
