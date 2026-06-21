@@ -590,9 +590,11 @@ export async function registerSession(
   };
 }
 
-// Claims and returns the oldest open todo bound to the caller's session, or null.
-// Per-space query (no collection-group); the claim is taken in a transaction so
-// two concurrent calls can never grab the same todo (NFA-03).
+// Claims and returns the next open todo bound to the caller's session, or null.
+// "Next" follows the manual list order (`order` asc, createdAt as tiebreak,
+// issue #243) so the agent works todos in the sequence the user arranged in the
+// web UI — matching list-todos. Per-space query (no collection-group); the claim
+// is taken in a transaction so two concurrent calls can't grab the same todo.
 export async function nextTodo(
   uid: string,
   input: { spaceId: string; hostname: string; workingFolder: string }
@@ -613,20 +615,32 @@ export async function nextTodo(
   const leaseTtl = session.leaseTtlSeconds;
 
   const open = snap.docs
-    .map((doc) => ({ id: doc.id, createdAt: doc.data().createdAt?.toMillis?.() ?? 0, d: doc.data() }))
+    .map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        order: typeof data.order === "number" ? data.order : 0,
+        createdAt: data.createdAt?.toMillis?.() ?? 0,
+        d: data,
+      };
+    })
     .filter((r) => r.d.completed !== true && r.d.aidoTurn === "aido");
+
+  // Manual list order (issue #243): lowest `order` first, createdAt as tiebreak.
+  const byOrder = (a: { order: number; createdAt: number }, b: { order: number; createdAt: number }) =>
+    a.order - b.order || a.createdAt - b.createdAt;
 
   // Already claimed by this session → return it (idempotent within a lease).
   const selfClaimed = open
     .filter((r) => r.d.claimedBy === sessionId && leaseValid(r.d.claimedAt, leaseTtl, nowMs))
-    .sort((a, b) => a.createdAt - b.createdAt);
+    .sort(byOrder);
   if (selfClaimed.length) {
     return claimedTodoView(input.spaceId, selfClaimed[0].id, selfClaimed[0].d);
   }
 
   const free = open
     .filter((r) => !r.d.claimedBy || !leaseValid(r.d.claimedAt, leaseTtl, nowMs))
-    .sort((a, b) => a.createdAt - b.createdAt);
+    .sort(byOrder);
 
   for (const row of free) {
     const ref = todosCol.doc(row.id);
