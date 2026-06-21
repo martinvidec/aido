@@ -49,9 +49,7 @@ export default function TodoSections({
           </button>
           {showDone &&
             done.map((t) => (
-              <div key={t.id} style={{ opacity: 0.55 }}>
-                <TodoRow todo={t} nameOf={nameOf} variant={variant} onOpenActions={onOpenActions} />
-              </div>
+              <TodoRow key={t.id} todo={t} nameOf={nameOf} variant={variant} onOpenActions={onOpenActions} dimmed />
             ))}
         </div>
       )}

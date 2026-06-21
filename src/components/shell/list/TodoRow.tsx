@@ -18,9 +18,15 @@ interface TodoRowProps {
   variant?: "desktop" | "mobile";
   /** Mobile: open the actions sheet for this todo (desktop uses an inline popover). */
   onOpenActions?: (todo: Todo) => void;
+  /**
+   * Dim the row (done section). Applied to the CONTENT only, never to a wrapper
+   * around the actions popover — `opacity < 1` forms a stacking context that
+   * would trap the z-40 popover below the next row and swallow its clicks.
+   */
+  dimmed?: boolean;
 }
 
-export default function TodoRow({ todo, nameOf, variant = "desktop", onOpenActions }: TodoRowProps) {
+export default function TodoRow({ todo, nameOf, variant = "desktop", onOpenActions, dimmed }: TodoRowProps) {
   const { setCompleted, editContent } = useTodos();
   const { accent } = useSpaces();
 
@@ -55,12 +61,17 @@ export default function TodoRow({ todo, nameOf, variant = "desktop", onOpenActio
       ? "rounded-2xl bg-bg-card px-3 py-3"
       : "rounded-xl px-2 py-2 hover:bg-row-hover";
 
+  // Dim done rows on the CONTENT only — never wrap the actions popover in an
+  // opacity layer (it forms a stacking context that traps the z-40 popover).
+  const dim = dimmed ? { opacity: 0.55 } : undefined;
+
   return (
     <div
       className={`relative flex flex-col gap-2 ${container}`}
       style={variant === "mobile" ? { border: "1px solid var(--border)" } : undefined}
     >
       <div className="flex items-start gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-3" style={dim}>
         <button
           type="button"
           aria-label={todo.completed ? "Wieder öffnen" : "Erledigen"}
@@ -119,6 +130,7 @@ export default function TodoRow({ todo, nameOf, variant = "desktop", onOpenActio
             </span>
           </button>
         )}
+        </div>
 
         {variant === "mobile" ? (
           <button
@@ -154,7 +166,7 @@ export default function TodoRow({ todo, nameOf, variant = "desktop", onOpenActio
       </div>
 
       {expanded && hasBody && (
-        <div className="pl-[34px]">
+        <div className="pl-[34px]" style={dim}>
           <TodoBody body={todo.body} onChange={(next) => editContent(todo.id, todo.title, next)} />
         </div>
       )}
