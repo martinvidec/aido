@@ -161,17 +161,19 @@ async function run() {
   await expectError("next-todo without a registered session → not_found", "not_found",
     () => nextTodo(ALICE, { spaceId: S1, hostname: "elsewhere", workingFolder: "/x" }));
 
-  // Two attached todos, explicit createdAt so "oldest first" is deterministic.
+  // Two attached todos. createdAt is deliberately INVERTED vs. order (a1 is the
+  // NEWER doc but has the LOWER order) so the test proves next-todo follows the
+  // manual order, not createdAt (issue #243).
   const attached = (createdAtMs: number) => ({
     spaceId: S1, body: null, completed: false, waitingOn: null, tags: [], mentions: [],
     createdBy: BOB, modifiedBy: BOB, createdAt: Timestamp.fromMillis(createdAtMs), order: 10,
     attachedSession: sess.sessionId, aidoTurn: "aido", claimedBy: null, claimedAt: null,
   });
-  await todoRef("a1").set({ ...attached(1000), title: "First question", order: 10 });
-  await todoRef("a2").set({ ...attached(2000), title: "Second question", order: 11 });
+  await todoRef("a1").set({ ...attached(2000), title: "First question", order: 10 });
+  await todoRef("a2").set({ ...attached(1000), title: "Second question", order: 11 });
 
   const first = await nextTodo(ALICE, { spaceId: S1, hostname: HOST, workingFolder: CWD });
-  check("next-todo returns the oldest attached todo", first?.todoId === "a1" && first?.title === "First question");
+  check("next-todo returns the lowest-order attached todo (not the oldest)", first?.todoId === "a1" && first?.title === "First question");
   const again = await nextTodo(ALICE, { spaceId: S1, hostname: HOST, workingFolder: CWD });
   check("next-todo self-claim is idempotent (same todo)", again?.todoId === "a1");
 
@@ -190,7 +192,7 @@ async function run() {
   check("handoff clears the claim", (await todoRef("a1").get()).data()!.claimedBy === null);
 
   const second = await nextTodo(ALICE, { spaceId: S1, hostname: HOST, workingFolder: CWD });
-  check("next-todo advances to the next todo after handoff", second?.todoId === "a2");
+  check("next-todo advances to the next todo (by order) after handoff", second?.todoId === "a2");
 
   await expectError("complete-todo via session blocked by default allowlist", "unauthorized",
     () => completeTodo(ALICE, S1, "a2", true, sess.sessionId));
