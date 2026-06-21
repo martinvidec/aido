@@ -264,12 +264,20 @@ export const editTodoContent = (
     modifiedBy: uid,
   });
 
+// Completing a todo also releases any agent-session binding (epic #212): a done
+// todo is no longer "assigned" to a session, so it stops showing a status badge.
+const releaseBinding = { attachedSession: null, aidoTurn: null, claimedBy: null, claimedAt: null };
+
 export const setTodoCompleted = (
   spaceId: string,
   todoId: string,
   completed: boolean,
   uid: string
-) => updateDoc(todoRef(spaceId, todoId), { completed, modifiedBy: uid });
+) =>
+  updateDoc(
+    todoRef(spaceId, todoId),
+    completed ? { completed, ...releaseBinding, modifiedBy: uid } : { completed, modifiedBy: uid }
+  );
 
 export const setTodoWaitingOn = (
   spaceId: string,
@@ -288,7 +296,11 @@ export const setTodoStatus = (
   todoId: string,
   status: { completed: boolean; waitingOn: string | null },
   uid: string
-) => updateDoc(todoRef(spaceId, todoId), { ...status, modifiedBy: uid });
+) =>
+  updateDoc(
+    todoRef(spaceId, todoId),
+    status.completed ? { ...status, ...releaseBinding, modifiedBy: uid } : { ...status, modifiedBy: uid }
+  );
 
 export const deleteTodo = (spaceId: string, todoId: string) =>
   deleteDoc(todoRef(spaceId, todoId));
@@ -366,10 +378,6 @@ export const detachTodoSession = (spaceId: string, todoId: string, uid: string) 
     claimedAt: null,
     modifiedBy: uid,
   });
-
-// "Zurück an aido": re-queue a handed-off (aidoTurn='user') todo for the session.
-export const returnTodoToAido = (spaceId: string, todoId: string, uid: string) =>
-  updateDoc(todoRef(spaceId, todoId), { aidoTurn: "aido", modifiedBy: uid });
 
 const sessionsCol = (uid: string) => collection(db, "users", uid, "sessions");
 const sessionRef = (uid: string, sessionId: string) => doc(db, "users", uid, "sessions", sessionId);

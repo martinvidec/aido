@@ -94,6 +94,12 @@ z.B. `MacBook · ~/Documents/GitHub/aido (aktiv vor 2 min)`. Beim Anhängen → 
 
 ### 4.3 Zustandsmaschine (Claim + Lease + „Ball im Feld")
 
+> **Nachtrag (umgesetzt):** Auf Wunsch wurde der „bei dir"-Rückkanal vereinfacht — **`handoff`
+> löst die Bindung** (Todo bleibt offen, ist danach **keiner** Session mehr zugeordnet), und
+> **Abschließen löst die Bindung ebenfalls**. Es gibt daher in der ausgelieferten Version **kein**
+> persistentes „bei dir" und **keinen** „Zurück an aido"-Knopf; zum erneuten Bearbeiten hängt man
+> das Todo neu an. Der Rest (Claim/Lease/Scope/Allowlist) gilt unverändert.
+
 Pro angehängtem Todo zwei Aspekte: **wessen Zug** (`aidoTurn: 'aido' | 'user'`) und der **Claim/
 Lease** (`claimedBy: sessionId | null`, `claimedAt: Timestamp | null`).
 

@@ -24,7 +24,7 @@ export default function TodoActions({
   onEdit: () => void;
   onClose: () => void;
 }) {
-  const { setWaitingOn, remove, returnToAido } = useTodos();
+  const { setWaitingOn, remove } = useTodos();
   const { activeSpace, spaces } = useSpaces();
   const [waitOpen, setWaitOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
@@ -104,20 +104,6 @@ export default function TodoActions({
             </div>
           )}
         </>
-      )}
-
-      {todo.aidoTurn === "user" && (
-        <button
-          type="button"
-          className={item}
-          style={{ minHeight: 44 }}
-          onClick={async () => {
-            await returnToAido(todo.id);
-            onClose();
-          }}
-        >
-          Zurück an aido
-        </button>
       )}
 
       <button

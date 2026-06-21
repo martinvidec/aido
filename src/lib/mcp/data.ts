@@ -289,6 +289,12 @@ export async function completeTodo(
     if (session.spaceId !== spaceId) throw new McpToolError("invalid", "spaceId does not match the session.");
     assertToolAllowed(session, "complete-todo");
     requireClaim(snap.data()!, sessionId, session.leaseTtlSeconds);
+  }
+  if (completed) {
+    // A completed todo is no longer assigned to any session — release the binding
+    // so it doesn't keep showing as "in Arbeit"/"bei aido" in the UI.
+    update.attachedSession = null;
+    update.aidoTurn = null;
     update.claimedBy = null;
     update.claimedAt = null;
   }
@@ -682,7 +688,8 @@ export async function updateTodo(
   return mapSessionTodoView(await ref.get());
 }
 
-// Hands the todo back to the human (open, aidoTurn='user') and releases the claim.
+// Hands the todo back to the human: leaves it OPEN but releases the session
+// binding (no longer assigned). To have the agent work it again, re-attach it.
 export async function handoffTodo(
   uid: string,
   input: { sessionId: string; spaceId: string; todoId: string }
@@ -699,6 +706,6 @@ export async function handoffTodo(
   if (!snap.exists) throw new McpToolError("not_found", `Todo ${input.todoId} not found.`);
   requireClaim(snap.data()!, input.sessionId, session.leaseTtlSeconds);
 
-  await ref.update({ aidoTurn: "user", claimedBy: null, claimedAt: null, modifiedBy: uid });
+  await ref.update({ attachedSession: null, aidoTurn: null, claimedBy: null, claimedAt: null, modifiedBy: uid });
   return mapSessionTodoView(await ref.get());
 }

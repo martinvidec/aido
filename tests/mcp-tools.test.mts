@@ -185,7 +185,8 @@ async function run() {
     () => updateTodo(ALICE, { sessionId: sess.sessionId, spaceId: S1, todoId: "a2", bodyMarkdown: "x" }));
 
   const ho = await handoffTodo(ALICE, { sessionId: sess.sessionId, spaceId: S1, todoId: "a1" });
-  check("handoff sets aidoTurn=user", ho.aidoTurn === "user");
+  check("handoff releases the binding, leaving the todo open",
+    ho.attachedSession === null && ho.aidoTurn === null && ho.completed === false);
   check("handoff clears the claim", (await todoRef("a1").get()).data()!.claimedBy === null);
 
   const second = await nextTodo(ALICE, { spaceId: S1, hostname: HOST, workingFolder: CWD });
@@ -196,7 +197,9 @@ async function run() {
   await registerSession(ALICE, { spaceId: S1, hostname: HOST, workingFolder: CWD, allowedTools: ["update-todo", "handoff", "complete-todo"] });
   const comp = await completeTodo(ALICE, S1, "a2", true, sess.sessionId);
   check("complete-todo via session works once allowed", comp.completed === true);
-  check("complete-todo via session clears the claim", (await todoRef("a2").get()).data()!.claimedBy === null);
+  const a2done = (await todoRef("a2").get()).data()!;
+  check("complete-todo via session clears the claim", a2done.claimedBy === null);
+  check("complete-todo releases the binding (no longer assigned)", a2done.attachedSession === null);
 
   // Lease: a stale claim by a DIFFERENT session is reclaimable.
   await todoRef("a3").set({ ...attached(3000), title: "Stale", order: 12, claimedBy: "other-session", claimedAt: Timestamp.fromMillis(1) });
