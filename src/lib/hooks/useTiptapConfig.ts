@@ -58,6 +58,12 @@ interface UseTiptapConfigOptions {
   placeholder?: string;
   enableMentionSuggestion: boolean;
   currentUserId?: string; // Added currentUserId
+  // When provided, mention suggestions are drawn from THIS list (e.g. the active
+  // space's members) instead of the current user's contacts — used by the
+  // per-todo thread (epic #247). Filtered by the typed query against `label`.
+  // Takes precedence over the contacts source; leaves the todo editor (which
+  // passes only currentUserId) unchanged.
+  mentionCandidates?: SuggestionItem[];
   // When set, task-list checkboxes stay interactive even in a non-editable
   // editor (issue #45: toggling a checklist item in the rendered todo body).
   // Return true to allow the toggle (TipTap then mutates the doc and fires onUpdate).
@@ -70,6 +76,7 @@ export function useTiptapConfig({
   placeholder,
   enableMentionSuggestion,
   currentUserId, // Destructure currentUserId
+  mentionCandidates,
   onReadOnlyChecked,
 }: UseTiptapConfigOptions): {
   extensions: EditorOptions['extensions'];
@@ -79,7 +86,19 @@ export function useTiptapConfig({
      HTMLAttributes: { class: 'mention' },
   };
 
-  if (enableMentionSuggestion && currentUserId) { // Check for currentUserId
+  if (enableMentionSuggestion && mentionCandidates) {
+    // Space-member source (epic #247): filter the provided candidates by the
+    // typed query — no network call, the members are already resolved.
+    mentionOptions.suggestion = {
+      ...baseSuggestionConfig,
+      items: ({ query: searchQuery }: { query: string }): SuggestionItem[] => {
+        const q = searchQuery.toLowerCase();
+        return mentionCandidates
+          .filter((c) => c.label.toLowerCase().includes(q))
+          .slice(0, 8);
+      },
+    };
+  } else if (enableMentionSuggestion && currentUserId) { // Check for currentUserId
     mentionOptions.suggestion = {
       ...baseSuggestionConfig, // Spread the rest of the config (render, etc.)
       items: async ({ query: searchQuery }: { query: string }): Promise<SuggestionItem[]> => {
