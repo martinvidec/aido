@@ -186,6 +186,14 @@ async function run() {
   await expectError("update-todo on an unclaimed todo → unauthorized", "unauthorized",
     () => updateTodo(ALICE, { sessionId: sess.sessionId, spaceId: S1, todoId: "a2", bodyMarkdown: "x" }));
 
+  // Default mode is now 'replace' (epic #252): the body holds the current result,
+  // not an ever-growing Q&A — the conversation lives in the thread instead. The
+  // append above left a1 with multiple blocks; a default update collapses it.
+  await updateTodo(ALICE, { sessionId: sess.sessionId, spaceId: S1, todoId: "a1", bodyMarkdown: "Endergebnis" });
+  const repDoc = (await todoRef("a1").get()).data()!.body as { content?: Array<{ content?: Array<{ text?: string }> }> };
+  check("update-todo defaults to replace (prior body replaced by the new result)",
+    repDoc.content?.length === 1 && repDoc.content?.[0]?.content?.[0]?.text === "Endergebnis");
+
   const ho = await handoffTodo(ALICE, { sessionId: sess.sessionId, spaceId: S1, todoId: "a1" });
   check("handoff releases the binding, leaving the todo open",
     ho.attachedSession === null && ho.aidoTurn === null && ho.completed === false);

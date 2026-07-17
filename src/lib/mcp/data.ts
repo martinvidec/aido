@@ -702,7 +702,10 @@ export async function nextTodo(
   return null;
 }
 
-// Writes the body from Markdown (append default / replace). Scoped to the
+// Writes the RESULT into the todo body from Markdown (replace default / append).
+// The member<->aido conversation (questions, rework) belongs in the discussion
+// thread (post-message), NOT the body (epic #247) — so 'replace' is the default:
+// the body holds the current result, not an ever-growing Q&A. Scoped to the
 // claimed todo + allowlist; re-derives tags/mentions; never auto-hands-off.
 export async function updateTodo(
   uid: string,
@@ -721,7 +724,7 @@ export async function updateTodo(
   requireClaim(snap.data()!, input.sessionId, session.leaseTtlSeconds);
 
   const existingBody = (snap.data()!.body ?? null) as Record<string, unknown> | null;
-  const mode = input.mode ?? "append";
+  const mode = input.mode ?? "replace";
   const newBody =
     mode === "replace"
       ? markdownToTiptap(input.bodyMarkdown)

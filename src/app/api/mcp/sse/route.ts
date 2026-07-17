@@ -141,7 +141,7 @@ const mcpHandler = createMcpHandler(
     );
     server.tool(
       "update-todo",
-      "Writes the body of the todo your session currently has claimed, from Markdown (code blocks supported). mode 'append' (default) preserves the original and adds an answer block; 'replace' overwrites.",
+      "Writes the RESULT of your work into the BODY of the todo your session has claimed, from Markdown (code blocks supported). mode 'replace' (default) overwrites the body with the current result; 'append' adds a block to it. Do NOT put questions or the back-and-forth conversation here — use post-message (the discussion thread) for that.",
       {
         sessionId: z.string().min(1),
         spaceId: z.string().min(1),
@@ -153,7 +153,7 @@ const mcpHandler = createMcpHandler(
     );
     server.tool(
       "handoff",
-      "Hands the claimed todo back to the human (keeps it open) and releases the claim.",
+      "Hands the claimed todo back to the human (keeps it open) and releases the claim. Post any open question to the thread FIRST (post-message) so the human sees what you need; they answer in the thread and re-attach the todo for you to continue.",
       { sessionId: z.string().min(1), spaceId: z.string().min(1), todoId: z.string().min(1) },
       (args) => safe(() => handleHandoff(args))
     );
