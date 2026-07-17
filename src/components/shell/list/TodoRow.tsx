@@ -7,6 +7,7 @@ import { useOutsideClick } from "@/lib/hooks/useOutsideClick";
 import TodoTitle from "./TodoTitle";
 import TodoBody from "./TodoBody";
 import TodoEditor from "./TodoEditor";
+import ThreadPanel from "./ThreadPanel";
 import TodoActions from "./TodoActions";
 import StatusBadge from "../StatusBadge";
 import { checklistProgress } from "@/lib/utils/checklist";
@@ -95,8 +96,8 @@ export default function TodoRow({ todo, nameOf, variant = "desktop", onOpenActio
         </button>
 
         <div
-          className={`min-w-0 flex-1 ${hasBody ? "cursor-pointer" : ""}`}
-          onClick={() => hasBody && setExpanded((e) => !e)}
+          className="min-w-0 flex-1 cursor-pointer"
+          onClick={() => setExpanded((e) => !e)}
         >
           <TodoTitle title={todo.title} completed={todo.completed} />
           {(todo.waitingOn || progress.total > 0 || todo.attachedSession) && (
@@ -119,24 +120,22 @@ export default function TodoRow({ todo, nameOf, variant = "desktop", onOpenActio
           )}
         </div>
 
-        {hasBody && (
-          <button
-            type="button"
-            aria-label="Details"
-            onClick={() => setExpanded((e) => !e)}
-            className="shrink-0 text-text-dim"
+        <button
+          type="button"
+          aria-label="Details"
+          onClick={() => setExpanded((e) => !e)}
+          className="shrink-0 text-text-dim"
+        >
+          <span
+            style={{
+              display: "inline-block",
+              transform: expanded ? "rotate(180deg)" : "none",
+              transition: "transform 0.15s",
+            }}
           >
-            <span
-              style={{
-                display: "inline-block",
-                transform: expanded ? "rotate(180deg)" : "none",
-                transition: "transform 0.15s",
-              }}
-            >
-              ⌄
-            </span>
-          </button>
-        )}
+            ⌄
+          </span>
+        </button>
         </div>
 
         {variant === "mobile" ? (
@@ -172,9 +171,12 @@ export default function TodoRow({ todo, nameOf, variant = "desktop", onOpenActio
         )}
       </div>
 
-      {expanded && hasBody && (
-        <div className="pl-[34px]" style={dim}>
-          <TodoBody body={todo.body} onChange={(next) => editContent(todo.id, todo.title, next)} />
+      {expanded && (
+        <div className="flex flex-col gap-3 pl-[34px]" style={dim}>
+          {hasBody && (
+            <TodoBody body={todo.body} onChange={(next) => editContent(todo.id, todo.title, next)} />
+          )}
+          <ThreadPanel spaceId={todo.spaceId} todoId={todo.id} accentColor={accent} />
         </div>
       )}
     </div>
