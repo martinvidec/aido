@@ -95,8 +95,42 @@ export interface Daily {
   createdAt: Timestamp | null;
 }
 
+/**
+ * ThreadMessage — one message in a todo's discussion thread (epic #247). Lives
+ * under `spaces/{spaceId}/todos/{todoId}/messages/{id}`, deliberately separate
+ * from the todo body so the back-and-forth between members and aido sessions
+ * doesn't clutter the task itself. Same rich-text capabilities as todos
+ * (Tiptap, `#`-tags, `@`-mentions — sourced from space members).
+ */
+export interface ThreadMessage {
+  id: string;
+  /** Rich-text message as Tiptap JSON, or null for an empty message. */
+  body: TiptapContent | null;
+  /** Plain-text extract (preview/search/aido context). */
+  text: string;
+  /** Derived from `#`-hashtags in the body. */
+  tags: string[];
+  /** Derived from `@`-mentions in the body (userIds). */
+  mentions: string[];
+  /** userId of the author; immutable after creation. */
+  author: string;
+  /**
+   * Who wrote it: a space member (`user`) or an aido session (`aido`). Clients
+   * may only create `user` messages (rules enforce it); `aido` messages are
+   * written through the Admin SDK by the MCP `post-message` tool.
+   */
+  source: "user" | "aido";
+  /** sessionId when written by an aido session, else null. */
+  sessionId: string | null;
+  createdAt: Timestamp | null;
+}
+
 /** Tool actions a session may perform; enforced server-side by the MCP layer. */
-export type AgentToolName = "update-todo" | "handoff" | "complete-todo";
+export type AgentToolName =
+  | "update-todo"
+  | "handoff"
+  | "complete-todo"
+  | "post-message";
 
 /**
  * Agent-Session (epic #212) — a running Claude-Code session bound to ONE space,

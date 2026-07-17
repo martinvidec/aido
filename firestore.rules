@@ -186,6 +186,41 @@ service cloud.firestore {
           && hasValidTodoFields()
           && hasValidWaitingOn();
         allow delete: if isMemberOfThisSpace();
+
+        // Discussion thread per todo (epic #247): a separate message stream so
+        // the member<->aido back-and-forth (questions, rework) doesn't clutter
+        // the todo body. Any space member may read and post; the author is
+        // immutable (no editing in the MVP — update is denied), and a member
+        // may delete only their own messages. Clients may only create `user`
+        // messages; `aido` messages are written by the MCP server via the Admin
+        // SDK (past these rules) and thus can't be forged from a client.
+        match /messages/{messageId} {
+          function hasValidMessageFields() {
+            return request.resource.data.author is string
+                && request.resource.data.source in ['user', 'aido']
+                && (!('body' in request.resource.data)
+                    || request.resource.data.body == null
+                    || request.resource.data.body is map)
+                && (!('text' in request.resource.data)
+                    || request.resource.data.text is string)
+                && (!('tags' in request.resource.data)
+                    || request.resource.data.tags is list)
+                && (!('mentions' in request.resource.data)
+                    || request.resource.data.mentions is list)
+                && (!('sessionId' in request.resource.data)
+                    || request.resource.data.sessionId == null
+                    || request.resource.data.sessionId is string);
+          }
+
+          allow read: if isMemberOfThisSpace();
+          allow create: if isMemberOfThisSpace()
+            && request.resource.data.author == request.auth.uid
+            && request.resource.data.source == 'user'
+            && hasValidMessageFields();
+          allow update: if false;
+          allow delete: if isMemberOfThisSpace()
+            && resource.data.author == request.auth.uid;
+        }
       }
 
       // Daily "Heute" items (issue #41): short-lived, space-scoped, kept separate
