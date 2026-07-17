@@ -20,6 +20,8 @@ import {
   handleNextTodo,
   handleUpdateTodo,
   handleHandoff,
+  handlePostMessage,
+  handleListMessages,
   errorResult,
 } from "@/lib/mcp/tool-logic";
 
@@ -127,13 +129,13 @@ const mcpHandler = createMcpHandler(
         hostname: z.string().min(1),
         workingFolder: z.string().min(1),
         label: z.string().optional(),
-        allowedTools: z.array(z.enum(["update-todo", "handoff", "complete-todo"])).optional(),
+        allowedTools: z.array(z.enum(["update-todo", "handoff", "complete-todo", "post-message"])).optional(),
       },
       (args) => safe(() => handleRegisterSession(args))
     );
     server.tool(
       "next-todo",
-      "Claims and returns the oldest open todo bound to this session (identified by hostname+workingFolder+spaceId), with its body as Markdown. Returns {todo:null} when nothing is queued.",
+      "Claims and returns the oldest open todo bound to this session (identified by hostname+workingFolder+spaceId), with its body as Markdown and its discussion thread (field 'thread'). Returns {todo:null} when nothing is queued.",
       { spaceId: z.string().min(1), hostname: z.string().min(1), workingFolder: z.string().min(1) },
       (args) => safe(() => handleNextTodo(args))
     );
@@ -154,6 +156,23 @@ const mcpHandler = createMcpHandler(
       "Hands the claimed todo back to the human (keeps it open) and releases the claim.",
       { sessionId: z.string().min(1), spaceId: z.string().min(1), todoId: z.string().min(1) },
       (args) => safe(() => handleHandoff(args))
+    );
+    server.tool(
+      "post-message",
+      "Posts a message from your session into the DISCUSSION THREAD of the todo you currently have claimed (Markdown; code blocks supported). Use this for questions, clarifications and rework notes — keep the conversation OUT of the todo body (that is for the result). Requires the 'post-message' allowlist entry.",
+      {
+        sessionId: z.string().min(1),
+        spaceId: z.string().min(1),
+        todoId: z.string().min(1),
+        bodyMarkdown: z.string().min(1),
+      },
+      (args) => safe(() => handlePostMessage(args))
+    );
+    server.tool(
+      "list-messages",
+      "Lists the discussion thread of a todo you can access (oldest first), each message as Markdown with its author.",
+      { spaceId: z.string().min(1), todoId: z.string().min(1) },
+      (args) => safe(() => handleListMessages(args))
     );
   },
   { serverInfo: { name: "aido-mcp-server", version: "0.2.0" } },

@@ -17,6 +17,8 @@ import {
   nextTodo,
   updateTodo,
   handoffTodo,
+  postMessage,
+  listMessages,
 } from "./data";
 
 // Firestore-backed MCP tool handlers (issue #119). Each handler resolves the
@@ -193,4 +195,23 @@ export async function handleHandoff(args: {
   const uid = requireUserUid();
   enforceWriteRateLimit(uid);
   return jsonResult(await handoffTodo(uid, args));
+}
+
+export async function handlePostMessage(args: {
+  sessionId: string;
+  spaceId: string;
+  todoId: string;
+  bodyMarkdown: string;
+}): Promise<CallToolResult> {
+  const uid = requireUserUid();
+  enforceWriteRateLimit(uid);
+  return jsonResult(await postMessage(uid, args));
+}
+
+export async function handleListMessages(args: {
+  spaceId: string;
+  todoId: string;
+}): Promise<CallToolResult> {
+  const uid = requireUserUid();
+  return jsonResult(await listMessages(uid, args.spaceId, args.todoId));
 }
