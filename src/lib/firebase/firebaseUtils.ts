@@ -31,7 +31,7 @@ import {
 import { getSpaceColor } from "../theme/colors";
 import { deriveTags, deriveMentions, extractPlainText, type MentionMember } from "../utils/textUtils";
 import { ORDER_STEP } from "../utils/order";
-import type { Space, Todo, Daily, TiptapContent, AgentSession, AgentToolName } from "../types";
+import type { Space, Todo, Daily, ThreadMessage, TiptapContent, AgentSession, AgentToolName } from "../types";
 // Auth functions
 export const logoutUser = () => signOut(auth);
 
@@ -548,6 +548,88 @@ export const setDailyCompleted = (spaceId: string, dailyId: string, completed: b
 
 export const deleteDaily = (spaceId: string, dailyId: string) =>
   deleteDoc(dailyRef(spaceId, dailyId));
+
+// --- Thread messages per todo (epic #247) ---
+// A discussion thread lives under spaces/{spaceId}/todos/{todoId}/messages,
+// deliberately separate from the todo body so the member<->aido back-and-forth
+// (questions, rework) stays out of the task itself. tags/mentions are derived
+// from the Tiptap body exactly like todos; the author is immutable and only the
+// author may delete their own message (see firestore.rules). Clients write only
+// source:'user' — 'aido' messages come from the MCP server via the Admin SDK.
+
+const messagesCol = (spaceId: string, todoId: string) =>
+  collection(db, SPACES_COLLECTION, spaceId, "todos", todoId, "messages");
+const messageRef = (spaceId: string, todoId: string, messageId: string) =>
+  doc(db, SPACES_COLLECTION, spaceId, "todos", todoId, "messages", messageId);
+
+const mapMessage = (d: QueryDocumentSnapshot<DocumentData>): ThreadMessage => {
+  const data = d.data();
+  return {
+    id: d.id,
+    body: (data.body as TiptapContent | null) ?? null,
+    text: typeof data.text === "string" ? data.text : "",
+    tags: Array.isArray(data.tags) ? data.tags : [],
+    mentions: Array.isArray(data.mentions) ? data.mentions : [],
+    author: typeof data.author === "string" ? data.author : "",
+    source: data.source === "aido" ? "aido" : "user",
+    sessionId: typeof data.sessionId === "string" ? data.sessionId : null,
+    createdAt: data.createdAt ?? null,
+  };
+};
+
+// One-shot load of a todo's thread, oldest first. Kept as a fallback; live
+// updates flow through subscribeThread.
+export const getThreadForTodo = async (
+  spaceId: string,
+  todoId: string
+): Promise<ThreadMessage[]> => {
+  if (!spaceId || !todoId) return [];
+  const snapshot = await getDocs(
+    query(messagesCol(spaceId, todoId), orderBy("createdAt", "asc"))
+  );
+  return snapshot.docs.map(mapMessage);
+};
+
+// Live subscription to a todo's thread (oldest first). Returns an unsubscribe
+// function; a component subscribes only while the todo's thread is open, so many
+// rows don't each hold a listener.
+export const subscribeThread = (
+  spaceId: string,
+  todoId: string,
+  onChange: (messages: ThreadMessage[]) => void,
+  onError?: (error: Error) => void
+): Unsubscribe =>
+  onSnapshot(
+    query(messagesCol(spaceId, todoId), orderBy("createdAt", "asc")),
+    (snap) => onChange(snap.docs.map(mapMessage)),
+    onError
+  );
+
+// Post a space member's message into a todo's thread. text/tags/mentions are
+// derived from the Tiptap body (same helpers as todos); source is always 'user'.
+export const postThreadMessage = async (
+  spaceId: string,
+  todoId: string,
+  uid: string,
+  body: TiptapContent | null
+): Promise<string> => {
+  if (!spaceId || !todoId || !uid) throw new Error("Missing space, todo or user.");
+  const ref = await addDoc(messagesCol(spaceId, todoId), {
+    body: body ?? null,
+    text: extractPlainText(body).trim(),
+    tags: deriveTags("", body),
+    mentions: deriveMentions(body),
+    author: uid,
+    source: "user",
+    sessionId: null,
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
+};
+
+// Delete a thread message. The rules permit this only for the author.
+export const deleteThreadMessage = (spaceId: string, todoId: string, messageId: string) =>
+  deleteDoc(messageRef(spaceId, todoId, messageId));
 
 // Helper function to generate a SHA-256 hash string from an email
 export const generateIdFromEmail = async (email: string): Promise<string> => {
