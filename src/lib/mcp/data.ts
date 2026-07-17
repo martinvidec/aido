@@ -2,7 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { FieldValue, type Timestamp, type Firestore } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase/admin";
-import { deriveTags, deriveMentions, type MentionMember } from "@/lib/utils/textUtils";
+import { deriveTags, deriveMentions, extractPlainText, type MentionMember } from "@/lib/utils/textUtils";
 import { markdownToTiptap, tiptapToMarkdown, appendAnswer } from "@/lib/tiptap/markdown";
 import type { AgentToolName } from "@/lib/types";
 
@@ -420,8 +420,8 @@ export async function addDaily(uid: string, spaceId: string, text: string): Prom
 // → next-todo (claim, lease) → update-todo / handoff / complete-todo. Wirkung is
 // bounded by (1) scope to the claimed todo and (2) the per-session allowlist.
 
-const DEFAULT_ALLOWED_TOOLS: AgentToolName[] = ["update-todo", "handoff"];
-const ALL_AGENT_TOOLS: AgentToolName[] = ["update-todo", "handoff", "complete-todo"];
+const DEFAULT_ALLOWED_TOOLS: AgentToolName[] = ["update-todo", "handoff", "post-message"];
+const ALL_AGENT_TOOLS: AgentToolName[] = ["update-todo", "handoff", "complete-todo", "post-message"];
 const DEFAULT_LEASE_TTL_SECONDS = 600;
 
 export interface SessionData {
@@ -450,6 +450,8 @@ export interface ClaimedTodo {
   tags: string[];
   createdBy: string;
   aidoTurn: "aido" | "user" | null;
+  /** The todo's discussion thread as Markdown (epic #247); "" when empty. */
+  thread: string;
 }
 
 export interface SessionTodoView extends TodoView {
@@ -528,7 +530,41 @@ function mapSessionTodoView(doc: FirebaseFirestore.DocumentSnapshot): SessionTod
   };
 }
 
-function claimedTodoView(spaceId: string, todoId: string, d: FirebaseFirestore.DocumentData): ClaimedTodo {
+// Serializes a todo's discussion thread to Markdown for the agent (epic #247):
+// one block per message, prefixed with the author (display name; "aido" for
+// session-authored messages). Empty string when there are no messages.
+async function loadThreadMarkdown(
+  db: Firestore,
+  spaceId: string,
+  todoId: string,
+  memberUids: string[]
+): Promise<string> {
+  const snap = await db
+    .collection("spaces").doc(spaceId).collection("todos").doc(todoId)
+    .collection("messages").orderBy("createdAt", "asc").get();
+  if (snap.empty) return "";
+  const members = await loadMentionMembers(db, memberUids);
+  const nameOf = (uid: string) => members.find((m) => m.uid === uid)?.displayName ?? uid;
+  return snap.docs
+    .map((doc) => {
+      const d = doc.data();
+      const body = (d.body ?? null) as Record<string, unknown> | null;
+      const who = d.source === "aido" ? "aido" : nameOf(typeof d.author === "string" ? d.author : "");
+      const md = tiptapToMarkdown(body) || (typeof d.text === "string" ? d.text : "");
+      return `**${who}:** ${md}`;
+    })
+    .join("\n\n");
+}
+
+// Builds the ClaimedTodo returned by next-todo, including the discussion thread
+// (epic #247) so the agent has the conversation context on pickup.
+async function buildClaimedTodo(
+  db: Firestore,
+  spaceId: string,
+  todoId: string,
+  d: FirebaseFirestore.DocumentData,
+  memberUids: string[]
+): Promise<ClaimedTodo> {
   const body = (d.body ?? null) as Record<string, unknown> | null;
   return {
     spaceId,
@@ -539,6 +575,7 @@ function claimedTodoView(spaceId: string, todoId: string, d: FirebaseFirestore.D
     tags: Array.isArray(d.tags) ? d.tags : [],
     createdBy: typeof d.createdBy === "string" ? d.createdBy : "",
     aidoTurn: d.aidoTurn === "aido" || d.aidoTurn === "user" ? d.aidoTurn : null,
+    thread: await loadThreadMarkdown(db, spaceId, todoId, memberUids),
   };
 }
 
@@ -599,7 +636,7 @@ export async function nextTodo(
   uid: string,
   input: { spaceId: string; hostname: string; workingFolder: string }
 ): Promise<ClaimedTodo | null> {
-  await requireMember(uid, input.spaceId);
+  const space = await requireMember(uid, input.spaceId);
   const sessionId = sessionIdFor(input.spaceId, (input.hostname ?? "").trim(), (input.workingFolder ?? "").trim());
   const session = await requireSession(uid, sessionId);
 
@@ -635,7 +672,7 @@ export async function nextTodo(
     .filter((r) => r.d.claimedBy === sessionId && leaseValid(r.d.claimedAt, leaseTtl, nowMs))
     .sort(byOrder);
   if (selfClaimed.length) {
-    return claimedTodoView(input.spaceId, selfClaimed[0].id, selfClaimed[0].d);
+    return buildClaimedTodo(db, input.spaceId, selfClaimed[0].id, selfClaimed[0].d, space.members);
   }
 
   const free = open
@@ -659,7 +696,7 @@ export async function nextTodo(
       claimed = false;
     }
     if (claimed) {
-      return claimedTodoView(input.spaceId, row.id, (await ref.get()).data()!);
+      return buildClaimedTodo(db, input.spaceId, row.id, (await ref.get()).data()!, space.members);
     }
   }
   return null;
@@ -722,4 +759,94 @@ export async function handoffTodo(
 
   await ref.update({ attachedSession: null, aidoTurn: null, claimedBy: null, claimedAt: null, modifiedBy: uid });
   return mapSessionTodoView(await ref.get());
+}
+
+// --- Thread messages per todo (epic #247) ---
+//
+// A discussion thread lives under spaces/{spaceId}/todos/{todoId}/messages,
+// separate from the todo body so the member<->aido back-and-forth (questions,
+// rework) stays out of the task itself. Members read/post via the client SDK
+// (firestore.rules); an agent session posts through post-message below, scoped to
+// its claimed todo (like update-todo) and gated by the 'post-message' allowlist.
+
+export interface ThreadMessageView {
+  id: string;
+  author: string;
+  authorName: string | null;
+  source: "user" | "aido";
+  markdown: string;
+  /** ISO 8601, or null while a serverTimestamp() write is still pending. */
+  createdAt: string | null;
+}
+
+function mapThreadMessageView(
+  doc: FirebaseFirestore.DocumentSnapshot,
+  nameOf: (uid: string) => string | null
+): ThreadMessageView {
+  const d = doc.data() ?? {};
+  const body = (d.body ?? null) as Record<string, unknown> | null;
+  const author = typeof d.author === "string" ? d.author : "";
+  return {
+    id: doc.id,
+    author,
+    authorName: nameOf(author),
+    source: d.source === "aido" ? "aido" : "user",
+    markdown: tiptapToMarkdown(body) || (typeof d.text === "string" ? d.text : ""),
+    createdAt: (d.createdAt as Timestamp | null)?.toDate?.().toISOString?.() ?? null,
+  };
+}
+
+// Lists a todo's discussion thread (member-gated), oldest-first, each message as
+// Markdown with its author's display name.
+export async function listMessages(
+  uid: string,
+  spaceId: string,
+  todoId: string
+): Promise<ThreadMessageView[]> {
+  const space = await requireMember(uid, spaceId);
+  if (!todoId) throw new McpToolError("invalid", "todoId is required.");
+  const db = requireDb();
+  const snap = await db
+    .collection("spaces").doc(spaceId).collection("todos").doc(todoId)
+    .collection("messages").orderBy("createdAt", "asc").get();
+  const members = await loadMentionMembers(db, space.members);
+  const nameOf = (u: string) => members.find((m) => m.uid === u)?.displayName ?? null;
+  return snap.docs.map((doc) => mapThreadMessageView(doc, nameOf));
+}
+
+// Posts an aido message into a todo's discussion thread (epic #247). Scoped to
+// the session's claimed todo (like update-todo) and gated by the 'post-message'
+// allowlist entry; source='aido'. Keeps the conversation OUT of the todo body.
+export async function postMessage(
+  uid: string,
+  input: { sessionId: string; spaceId: string; todoId: string; bodyMarkdown: string }
+): Promise<ThreadMessageView> {
+  const session = await requireSession(uid, input.sessionId);
+  if (session.spaceId !== input.spaceId) throw new McpToolError("invalid", "spaceId does not match the session.");
+  assertToolAllowed(session, "post-message");
+  const space = await requireMember(uid, input.spaceId);
+  if (!input.todoId) throw new McpToolError("invalid", "todoId is required.");
+  if (!(input.bodyMarkdown ?? "").trim()) throw new McpToolError("invalid", "bodyMarkdown is required.");
+
+  const db = requireDb();
+  const todoRef = db.collection("spaces").doc(input.spaceId).collection("todos").doc(input.todoId);
+  const todoSnap = await todoRef.get();
+  if (!todoSnap.exists) throw new McpToolError("not_found", `Todo ${input.todoId} not found.`);
+  requireClaim(todoSnap.data()!, input.sessionId, session.leaseTtlSeconds);
+
+  const body = markdownToTiptap(input.bodyMarkdown);
+  const ref = await todoRef.collection("messages").add({
+    body,
+    text: extractPlainText(body).trim(),
+    tags: deriveTags("", body),
+    mentions: deriveMentions(body),
+    author: uid,
+    source: "aido",
+    sessionId: input.sessionId,
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  const members = await loadMentionMembers(db, space.members);
+  const nameOf = (u: string) => members.find((m) => m.uid === u)?.displayName ?? null;
+  return mapThreadMessageView(await ref.get(), nameOf);
 }

@@ -29,7 +29,7 @@ const db = getFirestore(adminApp);
 
 // Import the real tool code AFTER the app exists (functions only touch Firestore
 // when called, so import order vs. init is safe, but keep it explicit).
-const { requireMember, listSpacesForUid, listTodos, addTodo, completeTodo, setWaitingOn, listDaily, addDaily, deleteTodo, whoami, listMembers, registerSession, nextTodo, updateTodo, handoffTodo, McpToolError } =
+const { requireMember, listSpacesForUid, listTodos, addTodo, completeTodo, setWaitingOn, listDaily, addDaily, deleteTodo, whoami, listMembers, registerSession, nextTodo, updateTodo, handoffTodo, postMessage, listMessages, McpToolError } =
   await import("../src/lib/mcp/data.ts");
 const { handleListSpaces } = await import("../src/lib/mcp/tool-logic.ts");
 const { runWithPrincipal } = await import("../src/lib/mcp/context.ts");
@@ -210,6 +210,40 @@ async function run() {
   await handoffTodo(ALICE, { sessionId: sess.sessionId, spaceId: S1, todoId: "a3" });
   const none = await nextTodo(ALICE, { spaceId: S1, hostname: HOST, workingFolder: CWD });
   check("next-todo returns null when nothing is queued", none === null);
+
+  // --- Thread messages (epic #247): post-message / list-messages / next-todo thread ---
+  await todoRef("m1").set({ ...attached(4000), title: "Thread todo", order: 20 });
+  const claimedM = await nextTodo(ALICE, { spaceId: S1, hostname: HOST, workingFolder: CWD });
+  check("next-todo claims the thread todo", claimedM?.todoId === "m1");
+  check("next-todo returns an empty thread for a fresh todo", claimedM?.thread === "");
+
+  // The current session (re-registered above) allows complete-todo but NOT
+  // post-message, so posting is blocked until it's granted.
+  await expectError("post-message blocked without the allowlist entry", "unauthorized",
+    () => postMessage(ALICE, { sessionId: sess.sessionId, spaceId: S1, todoId: "m1", bodyMarkdown: "Frage?" }));
+  await registerSession(ALICE, { spaceId: S1, hostname: HOST, workingFolder: CWD, allowedTools: ["update-todo", "handoff", "post-message"] });
+
+  const posted = await postMessage(ALICE, { sessionId: sess.sessionId, spaceId: S1, todoId: "m1", bodyMarkdown: "Kurze **Frage** zum Vorgehen?" });
+  check("post-message returns an aido message", posted.source === "aido" && posted.markdown.includes("Frage"));
+  const m1msgs = await db.collection("spaces").doc(S1).collection("todos").doc("m1").collection("messages").get();
+  check("post-message writes exactly one thread message", m1msgs.size === 1);
+  const pmd = m1msgs.docs[0].data();
+  check("post-message sets source=aido, author=caller, sessionId", pmd.source === "aido" && pmd.author === ALICE && pmd.sessionId === sess.sessionId);
+  check("post-message writes a Tiptap doc body", (pmd.body as { type?: string })?.type === "doc");
+
+  const listedMsgs = await listMessages(ALICE, S1, "m1");
+  check("list-messages returns the thread", listedMsgs.length === 1 && listedMsgs[0].source === "aido");
+  check("list-messages resolves the author name", listedMsgs[0].authorName === "Alice");
+  await expectError("list-messages rejects non-members", "unauthorized", () => listMessages(CAROL, S1, "m1"));
+
+  const withThread = await nextTodo(ALICE, { spaceId: S1, hostname: HOST, workingFolder: CWD });
+  check("next-todo surfaces the thread as markdown on the claimed todo",
+    withThread?.todoId === "m1" && !!withThread?.thread && withThread.thread.includes("aido"));
+
+  // post-message is claim-scoped: cannot post to a todo this session hasn't claimed.
+  await todoRef("m2").set({ ...attached(5000), title: "Not mine", order: 21, attachedSession: null, aidoTurn: null });
+  await expectError("post-message on an unclaimed todo → unauthorized", "unauthorized",
+    () => postMessage(ALICE, { sessionId: sess.sessionId, spaceId: S1, todoId: "m2", bodyMarkdown: "x" }));
 
   // --- principal gate (tool-logic): data tools require a user principal ---
   await expectError("no principal → unauthorized", "unauthorized", () => handleListSpaces());
