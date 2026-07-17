@@ -263,6 +263,7 @@ console.log('Space todos & daily (issue #41):');
 const TS = 'space-todos';
 const TODO2_PATH = `spaces/${TS}/todos/t1`;
 const DAILY_PATH = `spaces/${TS}/daily/d1`;
+const MSG_PATH = `spaces/${TS}/todos/t1/messages/m1`;
 async function resetSpaceTodos() {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     await setDoc(doc(ctx.firestore(), `spaces/${TS}`), {
@@ -272,6 +273,8 @@ async function resetSpaceTodos() {
       tags: [], mentions: [], createdBy: ALICE, createdAt: 1, order: 0 });
     await setDoc(doc(ctx.firestore(), DAILY_PATH), {
       spaceId: TS, text: 'milk', completed: false, date: '2020-01-01', author: ALICE, createdAt: 1 });
+    await setDoc(doc(ctx.firestore(), MSG_PATH), {
+      body: null, text: 'hello', tags: [], mentions: [], author: ALICE, source: 'user', sessionId: null, createdAt: 1 });
   });
 }
 await resetSpaceTodos();
@@ -446,6 +449,52 @@ await check('non-member may not delete a daily item', assertFails(
   deleteDoc(doc(db(MALLORY), `spaces/${TS}/daily/d2`))));
 await check('member may delete a daily item', assertSucceeds(
   deleteDoc(doc(db(ALICE), DAILY_PATH))));
+
+// Discussion thread per todo (epic #247). Note: the parent todo t1 was deleted
+// above, but message docs live independently and the rules gate on space
+// membership (via the space doc), not on the parent todo — so these still run.
+console.log('  thread messages (epic #247):');
+await check('member may read a thread message', assertSucceeds(
+  getDoc(doc(db(BOB), MSG_PATH))));
+await check('non-member may not read a thread message', assertFails(
+  getDoc(doc(db(MALLORY), MSG_PATH))));
+await check('member may post own user message', assertSucceeds(
+  setDoc(doc(db(BOB), `spaces/${TS}/todos/t1/messages/m2`), {
+    body: null, text: 'hi', tags: [], mentions: [], author: BOB, source: 'user', sessionId: null, createdAt: 1 })));
+await check('member may not post a message authored by someone else', assertFails(
+  setDoc(doc(db(BOB), `spaces/${TS}/todos/t1/messages/m3`), {
+    body: null, text: 'x', tags: [], mentions: [], author: ALICE, source: 'user', sessionId: null, createdAt: 1 })));
+// aido-source messages are written only through the Admin SDK (past these
+// rules); a client must not be able to forge one.
+await check('client may not forge an aido-source message', assertFails(
+  setDoc(doc(db(BOB), `spaces/${TS}/todos/t1/messages/m4`), {
+    body: null, text: 'x', tags: [], mentions: [], author: BOB, source: 'aido', sessionId: 's1', createdAt: 1 })));
+await check('non-member may not post a thread message', assertFails(
+  setDoc(doc(db(MALLORY), `spaces/${TS}/todos/t1/messages/m5`), {
+    body: null, text: 'x', tags: [], mentions: [], author: MALLORY, source: 'user', sessionId: null, createdAt: 1 })));
+// Field-type validation.
+await check('member may not post a message with a non-map body', assertFails(
+  setDoc(doc(db(BOB), `spaces/${TS}/todos/t1/messages/m6`), {
+    body: 'oops', text: 'x', tags: [], mentions: [], author: BOB, source: 'user', sessionId: null, createdAt: 1 })));
+await check('member may not post a message with non-string text', assertFails(
+  setDoc(doc(db(BOB), `spaces/${TS}/todos/t1/messages/m7`), {
+    body: null, text: 42, tags: [], mentions: [], author: BOB, source: 'user', sessionId: null, createdAt: 1 })));
+await check('member may not post a message with non-list tags', assertFails(
+  setDoc(doc(db(BOB), `spaces/${TS}/todos/t1/messages/m8`), {
+    body: null, text: 'x', tags: 'a', mentions: [], author: BOB, source: 'user', sessionId: null, createdAt: 1 })));
+await check('member may not post a message with a non-string sessionId', assertFails(
+  setDoc(doc(db(BOB), `spaces/${TS}/todos/t1/messages/m9`), {
+    body: null, text: 'x', tags: [], mentions: [], author: BOB, source: 'user', sessionId: 42, createdAt: 1 })));
+// No editing in the MVP: update is denied for everyone, including the author.
+await check('author may not edit a thread message (update denied)', assertFails(
+  updateDoc(doc(db(ALICE), MSG_PATH), { text: 'edited' })));
+// Delete: only the author may delete their own message.
+await check('member (non-author) may not delete a thread message', assertFails(
+  deleteDoc(doc(db(BOB), MSG_PATH))));
+await check('non-member may not delete a thread message', assertFails(
+  deleteDoc(doc(db(MALLORY), MSG_PATH))));
+await check('author may delete own thread message', assertSucceeds(
+  deleteDoc(doc(db(ALICE), MSG_PATH))));
 
 console.log('Legacy todo migration writes (issue #48):');
 await check('owner may create a space with migration marker fields', assertSucceeds(
